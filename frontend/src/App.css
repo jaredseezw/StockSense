@@ -1,0 +1,141 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f8faf7;
+  color: #10251c;
+}
+
+.app {
+  padding: 40px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  gap: 40px;
+  align-items: center;
+}
+
+h1 {
+  font-size: 48px;
+  margin: 0;
+  color: #0b6b35;
+}
+
+.tagline {
+  letter-spacing: 5px;
+  font-weight: bold;
+}
+
+h2 {
+  font-size: 56px;
+  margin-bottom: 10px;
+}
+
+.desc {
+  font-size: 18px;
+  max-width: 500px;
+}
+
+.searchBox {
+  margin-top: 25px;
+}
+
+input {
+  padding: 14px;
+  width: 260px;
+  border-radius: 10px;
+  border: 1px solid #ccc;
+}
+
+button {
+  padding: 14px 24px;
+  margin-left: 10px;
+  border: none;
+  border-radius: 10px;
+  background: #0b6b35;
+  color: white;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.mockup {
+  width: 420px;
+  height: 280px;
+  background: white;
+  border-radius: 24px;
+  padding: 30px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.12);
+}
+
+.green {
+  color: #0b6b35;
+  font-weight: bold;
+}
+
+.chart {
+  font-size: 80px;
+  margin: 30px 0;
+}
+
+.section {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 25px;
+  margin-top: 40px;
+}
+
+.problem, .solution, .how {
+  background: white;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+}
+
+.problem h3 {
+  color: #d82222;
+}
+
+.solution h3, .how h3 {
+  color: #0b6b35;
+}
+
+.features {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 15px;
+}
+
+.features div, .steps div {
+  background: #f0f7f2;
+  padding: 18px;
+  border-radius: 14px;
+  font-weight: bold;
+}
+
+.how {
+  margin-top: 25px;
+}
+
+.steps {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 18px;
+}
+.detailGrid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 25px;
+  margin-top: 30px;
+}
+
+.card {
+  background: white;
+  border-radius: 20px;
+  padding: 25px;
+  box-shadow: 0 10px 25px rgba(0,0,0,0.06);
+}
+
+.bigChart {
+  font-size: 120px;
+}
