@@ -251,12 +251,11 @@ function App() {
             </div>
 
             <div className="dashboardGrid priority">
-              <div className="card heroMini">
-                <h3>Learn before risking real money.</h3>
-                <p>Simple explanations, real market data, and risk-free practice.</p>
+              <div className="insightBar" onClick={() => setPage("learn")}>
+                💡 Unsure what P/E Ratio means? Learn key metrics in simple English.
               </div>
 
-              <div className="card focusCard">
+              <div className="card focusCard clickCard" onClick={() => setPage("portfolio")}>
                 <p>Portfolio Value</p>
                 <h2>$12,736.40</h2>
                 <b className="green">↑ +27.25%</b>
@@ -352,7 +351,7 @@ function App() {
 
             <h3>Trending Searches</h3>
             <div className="chips">
-              {stocks.slice().sort((a,b)=>b.popularity-a.popularity).slice(0,8).map(s => (
+              {stocks.slice().sort((a, b) => b.popularity - a.popularity).slice(0, 8).map(s => (
                 <button key={s.ticker} onClick={() => goStock(s)}>{s.ticker}</button>
               ))}
             </div>
@@ -380,16 +379,18 @@ function App() {
               <div className="card">
                 <h3>
                   Key Metrics
-                  <button className="learnIcon" onClick={goLearnMetrics}>?</button>
+                  <button className="learnIcon" onClick={goLearnMetrics}>
+                    ?
+                    <em>
+                      Key metrics help you understand valuation, risk, profitability and trading activity.
+                      Click to view the full beginner guide.
+                    </em>
+                  </button>
                 </h3>
 
                 {metricInfo.map((m) => (
                   <p key={m.key} className="metricLine">
                     <b>{m.name}</b>
-                    <span className="customTip">
-                      ?
-                      <em>{m.short}<br />Click ? near title for detailed guide.</em>
-                    </span>
                     <span>{m.value}</span>
                   </p>
                 ))}
@@ -461,10 +462,9 @@ function App() {
             </div>
 
             {learnSection === "basics" && (
-              <div className="dashboardGrid">
-                <div className="card"><h3>What is a Stock?</h3><p>A small ownership stake in a company.</p></div>
-                <div className="card"><h3>Diversification</h3><p>Spreading money across different investments.</p></div>
-                <div className="card"><h3>Reading Charts</h3><p>Understanding price movement over time.</p></div>
+              <div className="card">
+                <h3>Coming Soon</h3>
+                <p>This learning section will be developed in a later milestone.</p>
               </div>
             )}
 
