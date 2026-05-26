@@ -1,34 +1,50 @@
-from flask import Flask, jsonify
+"""
+StockSense Backend
+==================
+Flask API that powers the StockSense frontend.
+Data source: yfinance (free, no API key needed)
+Caching: in-memory with TTL to avoid hammering Yahoo Finance
+
+Run locally:
+    pip install -r requirements.txt
+    python app.py
+
+Deploy (Railway / Render / Fly.io):
+    Set PORT env var — the app reads it automatically.
+"""
+
+import os
+from flask import Flask
 from flask_cors import CORS
-import yfinance as yf
 
-app = Flask(__name__)  # Create Flask backend
-CORS(app)  # Allow React frontend to call this backend
+from routes.stocks import stocks_bp
+from routes.market import market_bp
+from routes.search import search_bp
 
-@app.route("/")  # Creates a route backend can respond to
-def home():  # Define function called home
-    return jsonify({
-        "message": "StockSense backend is running"
-    })  # Test to ensure backend is alive
+app = Flask(__name__)
 
-@app.route("/api/stock/<ticker>")  # Dynamic route for AAPL, TSLA, MSFT, etc.
-def get_stock(ticker):  # Takes in ticker input from the URL
-    stock = yf.Ticker(ticker)  # Creates a yfinance stock object
-    history = stock.history(period="1mo")  # Gets 1 month of historical stock data
+# Allow requests from your React dev server and production domain.
+# Update ALLOWED_ORIGINS in .env when you deploy.
+allowed_origins = os.getenv(
+    "ALLOWED_ORIGINS",
+    "http://localhost:3000,http://localhost:5173"
+).split(",")
 
-    if history.empty:  # Checks whether yfinance returned no data
-        return jsonify({
-            "error": "No data found for this ticker"
-        }), 404
+CORS(app, origins=allowed_origins)
 
-    latest_price = history["Close"].iloc[-1]  # Take the Close price column, then the last row
+# Register route blueprints
+app.register_blueprint(stocks_bp, url_prefix="/api")
+app.register_blueprint(market_bp, url_prefix="/api")
+app.register_blueprint(search_bp, url_prefix="/api")
 
-    return jsonify({
-        "ticker": ticker.upper(),
-        "latest_price": round(float(latest_price), 2),
-        "dates": [str(date.date()) for date in history.index],
-        "prices": [round(float(price), 2) for price in history["Close"]]
-    })
 
-if __name__ == "__main__":  # Checks whether file is run directly
-    app.run(debug=True)  # Starts Flask backend server
+@app.route("/api/health")
+def health():
+    return {"status": "ok", "version": "1.0.0"}
+
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8000))
+    debug = os.getenv("FLASK_ENV", "development") == "development"
+    print(f"StockSense backend starting on port {port}")
+    app.run(host="0.0.0.0", port=port, debug=debug)

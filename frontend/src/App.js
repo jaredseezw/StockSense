@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
 import { auth } from "./firebase";
 import {
@@ -6,9 +6,49 @@ import {
   signInWithEmailAndPassword,
   signOut,
   onAuthStateChanged,
+  updateProfile,
+  deleteUser,
 } from "firebase/auth";
 
+const API = "http://localhost:8000/api";
+
+// Expanded sector universe - 10 well-known tickers per sector
+// Backend will fetch live prices + sort by volume ratio (trending)
+const SECTOR_UNIVERSE = {
+  "ETFs":           ["VOO","SPY","QQQ","VTI","IWM","ARKK","DIA","VUG","SCHD","VYM"],
+  "Technology":     ["AAPL","MSFT","NVDA","GOOGL","META","TSLA","CRM","ORCL","AMD","INTC"],
+  "Energy":         ["XOM","CVX","SHEL","BP","COP","SLB","EOG","PSX","VLO","MPC"],
+  "Travel":         ["ABNB","DAL","UAL","AAL","BKNG","MAR","HLT","CCL","RCL","LUV"],
+  "Healthcare":     ["UNH","JNJ","LLY","PFE","ABBV","MRK","TMO","ABT","MRNA","BMY"],
+  "Finance":        ["JPM","BAC","GS","MS","WFC","C","V","MA","AXP","PYPL"],
+  "E-Commerce":     ["AMZN","BABA","SHOP","MELI","EBAY","ETSY","JD","PDD","W","CHWY"],
+  "Consumer Goods": ["KO","PEP","PG","NKE","MCD","SBUX","COST","WMT","TGT","AMZN"],
+  "Health & Fitness":["PTON","LULU","PLNT","NKE","GRMN","DXCM","ISRG","SYK","EW","HOLX"],
+};
+
+// All timeframes with yfinance params
+const TIMEFRAMES = [
+  { label: "1D",  period: "1d",   interval: "5m"  },   // intraday — shows time
+  { label: "1W",  period: "5d",   interval: "1d"  },   // 5 trading days — shows date
+  { label: "1M",  period: "1mo",  interval: "1d"  },
+  { label: "3M",  period: "3mo",  interval: "1d"  },
+  { label: "YTD", period: "ytd",  interval: "1d"  },
+  { label: "1Y",  period: "1y",   interval: "1d"  },
+  { label: "5Y",  period: "5y",   interval: "1wk" },
+  { label: "All", period: "max",  interval: "1mo" },
+];
+
 const stocks = [
+  // ETFs & Index Funds
+  { name: "S&P 500 ETF (Vanguard)", ticker: "VOO", sector: "ETF", price: 510.0, change: 0.51, popularity: 97 },
+  { name: "SPDR S&P 500 ETF", ticker: "SPY", sector: "ETF", price: 524.0, change: 0.51, popularity: 96 },
+  { name: "Invesco QQQ ETF (Nasdaq 100)", ticker: "QQQ", sector: "ETF", price: 455.0, change: 0.73, popularity: 94 },
+  { name: "Vanguard Total Stock Market ETF", ticker: "VTI", sector: "ETF", price: 240.0, change: 0.45, popularity: 90 },
+  { name: "iShares Russell 2000 ETF", ticker: "IWM", sector: "ETF", price: 205.0, change: 0.22, popularity: 82 },
+  { name: "ARK Innovation ETF", ticker: "ARKK", sector: "ETF", price: 48.0, change: 1.2, popularity: 78 },
+  { name: "SPDR Dow Jones ETF", ticker: "DIA", sector: "ETF", price: 385.0, change: 0.32, popularity: 75 },
+  { name: "Vanguard Growth ETF", ticker: "VUG", sector: "ETF", price: 330.0, change: 0.6, popularity: 72 },
+  // Stocks
   { name: "Apple", ticker: "AAPL", sector: "Technology", price: 175.43, change: 1.18, popularity: 98 },
   { name: "Microsoft", ticker: "MSFT", sector: "Technology", price: 343.8, change: -0.92, popularity: 95 },
   { name: "NVIDIA", ticker: "NVDA", sector: "Technology", price: 949.5, change: 2.35, popularity: 99 },
@@ -198,7 +238,7 @@ function MetricVisualFull({ type }) {
       </div>
       <div className="peTrack">
         <div className="peDot" style={{ left: "58%" }}><div className="peDotInner peThis" /><div className="peDotLabel">This stock<br />28.4</div></div>
-        <div className="peDot" style={{ left: "36%" }}><div className="peDotInner peAvg" /><div className="peDotLabel peAvgLabel">S&P avg<br />~22</div></div>
+        <div className="peDot" style={{ left: "36%" }}><div className="peDotInner peAvg" /><div className="peDotLabel peAvgLabel">S&P 500<br />~22</div></div>
       </div>
     </div>
   );
@@ -258,8 +298,8 @@ function MetricVisualFull({ type }) {
       </div>
       <div className="yieldPointerRow">
         <div className="yieldPointer" style={{ left: "18%" }}>
+          <div className="yieldPointerLabel">This stock <b>0.6%</b></div>
           <div className="yieldPointerDot" />
-          <div className="yieldPointerLabel">This stock<br /><b>0.6%</b></div>
         </div>
       </div>
       <div className="yieldZoneDesc">
@@ -302,23 +342,20 @@ function MetricVisualFull({ type }) {
   if (type === "gauge") return (
     <div className="vizFull gaugeVizFull">
       <svg viewBox="0 0 200 120" className="gaugeSvg">
-        {/* Semicircle arcs: total span 0→3 mapped over 180deg, left=0, right=3 */}
-        {/* Calm 0–0.8: 0–48deg of 180 */}
-        <path d="M20,100 A80,80 0 0,1 62,28" fill="none" stroke="#d4f7e5" strokeWidth="16" strokeLinecap="butt" />
-        {/* Market-like 0.8–1.2: 48–72deg */}
-        <path d="M62,28 A80,80 0 0,1 94,21" fill="none" stroke="#e8f0e8" strokeWidth="16" strokeLinecap="butt" />
-        {/* Aggressive 1.2–2.0: 72–120deg */}
-        <path d="M94,21 A80,80 0 0,1 153,38" fill="none" stroke="#fff4d6" strokeWidth="16" strokeLinecap="butt" />
-        {/* Very risky 2.0–3.0: 120–180deg */}
-        <path d="M153,38 A80,80 0 0,1 180,100" fill="none" stroke="#fde8e8" strokeWidth="16" strokeLinecap="butt" />
-        {/* Needle for beta=1.2 → 72deg from left → angle from bottom = 180-72=108deg → pointing to ~(100-80*sin72, 100-80*cos72) */}
-        {/* At 72deg: x=100+80*cos(108°)=100-24.7=75.3, y=100-80*sin(108°)=100-76.1=23.9 */}
+        {/* Calm 0–0.8: bold green */}
+        <path d="M20,100 A80,80 0 0,1 62,28" fill="none" stroke="#2ecc71" strokeWidth="16" strokeLinecap="butt" />
+        {/* Market-like 0.8–1.2: steel blue */}
+        <path d="M62,28 A80,80 0 0,1 94,21" fill="none" stroke="#95a5a6" strokeWidth="16" strokeLinecap="butt" />
+        {/* Aggressive 1.2–2.0: amber */}
+        <path d="M94,21 A80,80 0 0,1 153,38" fill="none" stroke="#f39c12" strokeWidth="16" strokeLinecap="butt" />
+        {/* Very risky 2.0–3.0: bold red */}
+        <path d="M153,38 A80,80 0 0,1 180,100" fill="none" stroke="#e74c3c" strokeWidth="16" strokeLinecap="butt" />
+        {/* Needle pointing to beta=1.2 */}
         <line x1="100" y1="100" x2="75" y2="24" stroke="#173427" strokeWidth="3" strokeLinecap="round" />
         <circle cx="100" cy="100" r="7" fill="#173427" />
-        {/* Value label below needle pivot */}
         <text x="100" y="116" textAnchor="middle" fontSize="12" fontWeight="800" fill="#173427">β 1.2</text>
-        <text x="14" y="112" fontSize="8" fill="#888">Calm</text>
-        <text x="158" y="112" fontSize="8" fill="#888">Risky</text>
+        <text x="14" y="112" fontSize="8" fill="#2ecc71" fontWeight="700">Calm</text>
+        <text x="152" y="112" fontSize="8" fill="#e74c3c" fontWeight="700">Risky</text>
       </svg>
     </div>
   );
@@ -367,10 +404,6 @@ function MetricModal({ metric, onClose }) {
           <h4>Detailed Explanation</h4>
           <p>{metric.detail}</p>
         </div>
-        <div className="modalYf">
-          <small>yfinance key:</small>
-          <code>{metric.yf}</code>
-        </div>
       </div>
     </div>
   );
@@ -383,8 +416,8 @@ function App() {
   const [recent, setRecent] = useState(["NVDA", "AMZN", "AAPL"]);
   const [sortKey, setSortKey] = useState("change");
   const [sortDir, setSortDir] = useState("desc");
-  const [userName, setUserName] = useState("Rann");
-  const [timeFrame, setTimeFrame] = useState("1M");
+  const [userName, setUserName] = useState("Guest");
+  const [timeFrame, setTimeFrame] = useState("1D");
   const [selectedSector, setSelectedSector] = useState("Technology");
   const [learnSection, setLearnSection] = useState("basics");
   const [openMetric, setOpenMetric] = useState(null);
@@ -393,7 +426,29 @@ function App() {
   const [authMode, setAuthMode] = useState("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [displayName, setDisplayName] = useState("");
   const [authError, setAuthError] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  // ── Chart state ─────────────────────────────────────────────────────────
+  const [chartData, setChartData] = useState(null);
+  const [chartLoading, setChartLoading] = useState(false);
+  const canvasRef = useRef(null);
+
+  // ── Live data from backend ──────────────────────────────────────────────
+  const [searchIndex, setSearchIndex] = useState([]);   // full ticker list for autocomplete
+  const [movers, setMovers] = useState({ gainers: [], losers: [] });
+  const [moversLoading, setMoversLoading] = useState(true);
+  const [sectorStocks, setSectorStocks] = useState([]);
+  const [sectorLoading, setSectorLoading] = useState(false);
+  const [stockDetail, setStockDetail] = useState(null);  // real data for selected stock
+  const [stockLoading, setStockLoading] = useState(false);
+
+  // ── Live search fallback state ──────────────────────────────────────────
+  const [liveResults, setLiveResults] = useState([]);
+  const [liveLoading, setLiveLoading] = useState(false);
+  const [liveSearched, setLiveSearched] = useState(false); // has user triggered live search?
+  const liveSearchTimer = useRef(null);
 
   const dailyInsights = [
     { tip: "When volume spikes 3× the usual, it almost always means big news — earnings surprises, analyst upgrades, or major announcements. A price move on high volume is far more trustworthy than one on low volume.", tag: "Volume", emoji: "📊" },
@@ -411,29 +466,278 @@ function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Fetch search index once on mount — used for autocomplete
+  // Merges API results with local stocks so local data always works even if API is down
+  useEffect(() => {
+    fetch(`${API}/search/index`)
+      .then(r => r.json())
+      .then(data => {
+        if (!Array.isArray(data) || data.length === 0) return; // keep local stocks as fallback
+        // Normalize API items — backend may return { ticker, name, sector } or similar
+        const normalized = data.map(item => ({
+          ticker: item.ticker || item.symbol || "",
+          name:   item.name   || item.longName || item.ticker || "",
+          sector: item.sector || "Unknown",
+        })).filter(item => item.ticker);
+        // Merge: local stocks first (trusted), then API items not already in local list
+        const localTickers = new Set(stocks.map(s => s.ticker));
+        const apiOnly = normalized.filter(item => !localTickers.has(item.ticker));
+        setSearchIndex([...stocks, ...apiOnly]);
+      })
+      .catch(() => {
+        // API down — just use local stocks for autocomplete
+        setSearchIndex(stocks);
+      });
+  }, []);
+
+  // Fetch movers whenever search page is opened
+  useEffect(() => {
+    if (page !== "search") return;
+    setMoversLoading(true);
+    fetch(`${API}/stocks/movers?n=6`)
+      .then(r => r.json())
+      .then(data => {
+        const gainers = Array.isArray(data?.gainers) ? data.gainers : [];
+        const losers  = Array.isArray(data?.losers)  ? data.losers  : [];
+        if (gainers.length === 0 && losers.length === 0) {
+          // API returned empty or wrong shape — fall back to local stocks
+          const sorted = [...stocks].sort((a, b) => b.change - a.change);
+          setMovers({ gainers: sorted.slice(0, 6), losers: sorted.slice(-6).reverse() });
+        } else {
+          setMovers({ gainers, losers });
+        }
+        setMoversLoading(false);
+      })
+      .catch(() => {
+        // API down — derive movers from local static stocks
+        const sorted = [...stocks].sort((a, b) => b.change - a.change);
+        setMovers({ gainers: sorted.slice(0, 6), losers: sorted.slice(-6).reverse() });
+        setMoversLoading(false);
+      });
+  }, [page]);
+
+  // Fetch sector stocks when sector tab changes - uses expanded universe, returns top 10 by volume ratio
+  useEffect(() => {
+    if (page !== "search") return;
+    setSectorLoading(true);
+    const tickers = (SECTOR_UNIVERSE[selectedSector] || []).join(",");
+    fetch(`${API}/stocks/trending?tickers=${encodeURIComponent(tickers)}&n=10`)
+      .then(r => r.json())
+      .then(data => { setSectorStocks(Array.isArray(data) ? data : []); setSectorLoading(false); })
+      .catch(() => {
+        // Fallback to old sector endpoint
+        fetch(`${API}/stocks/list?sector=${encodeURIComponent(selectedSector)}`)
+          .then(r => r.json())
+          .then(data => { setSectorStocks(data.slice(0, 10)); setSectorLoading(false); })
+          .catch(() => setSectorLoading(false));
+      });
+  }, [selectedSector, page]);
+
+  // Fetch full stock detail when a stock is selected
+  useEffect(() => {
+    if (!selectedStock) return;
+    setStockLoading(true);
+    fetch(`${API}/stock/${selectedStock.ticker}`)
+      .then(r => r.json())
+      .then(data => { setStockDetail(data); setStockLoading(false); })
+      .catch(() => setStockLoading(false));
+  }, [selectedStock]);
+
+  // Fetch chart data when stock or timeframe changes
+  useEffect(() => {
+    if (!selectedStock || page !== "stock") return;
+    setChartLoading(true);
+    setChartData(null);
+    fetch(`${API}/stock/${selectedStock.ticker}/chart?range=${timeFrame}`)
+      .then(r => r.json())
+      .then(data => { setChartData(data); setChartLoading(false); })
+      .catch(() => setChartLoading(false));
+  }, [selectedStock, timeFrame, page]);
+
+  // ── Chart hover state ──────────────────────────────────────────────────
+  const [hoverInfo, setHoverInfo] = useState(null);
+  const chartMetaRef = useRef(null);
+
+  function drawChart(canvas, data) {
+    if (!canvas || !data || data.error) return;
+    const ctx = canvas.getContext("2d");
+    const { closes, labels, period_change } = data;
+    if (!closes || closes.length === 0) return;
+
+    canvas.width  = canvas.offsetWidth  * window.devicePixelRatio;
+    canvas.height = canvas.offsetHeight * window.devicePixelRatio;
+    ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+    const w = canvas.offsetWidth;
+    const h = canvas.offsetHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    const padL = 60, padR = 18, padT = 24, padB = 40;
+    const chartW = w - padL - padR;
+    const chartH = h - padT - padB;
+
+    const minP = Math.min(...closes);
+    const maxP = Math.max(...closes);
+    const range = maxP - minP || 1;
+
+    const xOf = i => padL + (i / (closes.length - 1)) * chartW;
+    const yOf = v => padT + (1 - (v - minP) / range) * chartH;
+
+    const isUp = period_change >= 0;
+    const lineColor = isUp ? "#1a9e5c" : "#e74c3c";
+
+    // Gradient fill
+    const grad = ctx.createLinearGradient(0, padT, 0, padT + chartH);
+    grad.addColorStop(0, isUp ? "rgba(26,158,92,0.20)" : "rgba(231,76,60,0.16)");
+    grad.addColorStop(1, isUp ? "rgba(26,158,92,0.01)" : "rgba(231,76,60,0.01)");
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(closes[0]));
+    closes.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
+    ctx.lineTo(xOf(closes.length - 1), padT + chartH);
+    ctx.lineTo(xOf(0), padT + chartH);
+    ctx.closePath();
+    ctx.fillStyle = grad;
+    ctx.fill();
+
+    // Line
+    ctx.beginPath();
+    ctx.moveTo(xOf(0), yOf(closes[0]));
+    closes.forEach((v, i) => ctx.lineTo(xOf(i), yOf(v)));
+    ctx.strokeStyle = lineColor;
+    ctx.lineWidth = 2.2;
+    ctx.lineJoin = "round";
+    ctx.stroke();
+
+    // End dot
+    ctx.beginPath();
+    ctx.arc(xOf(closes.length - 1), yOf(closes[closes.length - 1]), 5, 0, Math.PI * 2);
+    ctx.fillStyle = lineColor;
+    ctx.fill();
+
+    // Y gridlines + labels (5 levels)
+    ctx.font = "11px 'Plus Jakarta Sans', sans-serif";
+    ctx.textAlign = "right";
+    for (let i = 0; i <= 4; i++) {
+      const v = minP + (range * i) / 4;
+      const y = yOf(v);
+      ctx.fillStyle = "#8a9e90";
+      ctx.fillText(`$${v >= 1000 ? (v / 1000).toFixed(1) + "k" : v.toFixed(2)}`, padL - 6, y + 4);
+      ctx.setLineDash([2, 5]);
+      ctx.strokeStyle = "rgba(0,0,0,0.05)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(padL + chartW, y); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // X axis labels (up to 5)
+    ctx.textAlign = "center";
+    ctx.fillStyle = "#8a9e90";
+    const xTicks = Math.min(5, labels.length);
+    for (let i = 0; i < xTicks; i++) {
+      const idx = Math.round((i / (xTicks - 1)) * (labels.length - 1));
+      ctx.fillText(labels[idx], xOf(idx), h - 8);
+    }
+
+    // Store meta for hover
+    chartMetaRef.current = { xOf, yOf, closes, labels, padL, padR, padT, chartW, chartH, w, h };
+  }
+
+  // Draw chart on canvas whenever chartData changes
+  useEffect(() => {
+    if (!chartData || !canvasRef.current || chartData.error) return;
+    drawChart(canvasRef.current, chartData);
+    setHoverInfo(null);
+  }, [chartData]);
+
+  const handleChartMouseMove = useCallback((e) => {
+    const meta = chartMetaRef.current;
+    if (!meta || !chartData || chartData.error) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const { xOf, yOf, closes, labels, padL, padR, padT, chartW, chartH, w } = meta;
+    if (mx < padL || mx > w - padR || my < padT || my > padT + chartH) { setHoverInfo(null); return; }
+    const idx = Math.max(0, Math.min(closes.length - 1, Math.round(((mx - padL) / chartW) * (closes.length - 1))));
+    const hoverPrice = closes[idx];
+    const openPrice = closes[0];
+    const pctChange = openPrice > 0 ? ((hoverPrice - openPrice) / openPrice) * 100 : 0;
+    setHoverInfo({ x: xOf(idx), y: yOf(hoverPrice), price: hoverPrice, label: labels[idx], pctChange });
+  }, [chartData]);
+
+  const handleChartMouseLeave = useCallback(() => setHoverInfo(null), []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setAuthUser(user);
-
-      if (user?.email) {
-        setUserName(user.email.split("@")[0]);
+      if (user) {
+        setUserName(user.displayName || user.email.split("@")[0]);
       }
     });
-
     return () => unsubscribe();
   }, []);
 
   const hour = new Date().getHours();
-  const greeting = hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
+  const greeting = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
 
+  // Autocomplete from live search index (falls back to local stocks if index not loaded yet)
   const suggestions = useMemo(() => {
     if (!query.trim()) return [];
     const q = query.toLowerCase();
-    return stocks.filter((s) => s.name.toLowerCase().includes(q) || s.ticker.toLowerCase().includes(q)).slice(0, 5);
-  }, [query]);
+    const source = searchIndex.length > 0 ? searchIndex : stocks;
+    return source
+      .filter(s => s.name.toLowerCase().includes(q) || s.ticker.toLowerCase().includes(q))
+      .slice(0, 8);
+  }, [query, searchIndex]);
 
-  const topGainers = [...stocks].sort((a, b) => b.change - a.change).slice(0, 6);
-  const topLosers = [...stocks].sort((a, b) => a.change - b.change).slice(0, 6);
+  // Live results deduped against local suggestions (no duplicates in dropdown)
+  const dedupedLiveResults = useMemo(() => {
+    const localTickers = new Set(suggestions.map(s => s.ticker));
+    return liveResults.filter(s => !localTickers.has(s.ticker));
+  }, [liveResults, suggestions]);
+
+  // Reset live search whenever query changes; auto-trigger if no local results after delay
+  useEffect(() => {
+    setLiveResults([]);
+    setLiveSearched(false);
+    clearTimeout(liveSearchTimer.current);
+
+    if (!query.trim()) return;
+
+    // Auto-trigger live search after 600ms if no local results
+    liveSearchTimer.current = setTimeout(() => {
+      const source = searchIndex.length > 0 ? searchIndex : stocks;
+      const hasLocal = source.some(s =>
+        s.name.toLowerCase().includes(query.toLowerCase()) ||
+        s.ticker.toLowerCase().includes(query.toLowerCase())
+      );
+      if (!hasLocal) {
+        setLiveLoading(true);
+        setLiveSearched(true);
+        fetch(`${API}/search?q=${encodeURIComponent(query.trim())}&limit=10`)
+          .then(r => r.json())
+          .then(data => {
+            setLiveResults(Array.isArray(data) ? data : (data.results || []));
+            setLiveLoading(false);
+          })
+          .catch(() => setLiveLoading(false));
+      }
+    }, 600);
+  }, [query, searchIndex]);
+
+  function triggerLiveSearch() {
+    if (!query.trim() || liveLoading) return;
+    setLiveLoading(true);
+    setLiveSearched(true);
+    fetch(`${API}/search?q=${encodeURIComponent(query.trim())}&limit=10`)
+      .then(r => r.json())
+      .then(data => {
+        setLiveResults(Array.isArray(data) ? data : (data.results || []));
+        setLiveLoading(false);
+      })
+      .catch(() => setLiveLoading(false));
+  }
+
+  const topGainers = movers.gainers || [];
+  const topLosers = movers.losers || [];
 
   const sortedHoldings = [...holdings].sort((a, b) => {
     let val;
@@ -448,7 +752,10 @@ function App() {
   }
 
   function goStock(stock) {
-    setSelectedStock(stock);
+    // stock may come from local index (no price) or movers (has price) — normalise
+    const base = stocks.find(s => s.ticker === stock.ticker) || stock;
+    setSelectedStock({ ...base, ...stock });
+    setStockDetail(null); // clear previous detail while new one loads
     setRecent((prev) => [stock.ticker, ...prev.filter((x) => x !== stock.ticker)].slice(0, 5));
     setPage("stock");
     setQuery("");
@@ -456,8 +763,33 @@ function App() {
 
   function searchStock() {
     const q = query.toLowerCase().trim();
-    const found = stocks.find((s) => s.ticker.toLowerCase() === q || s.name.toLowerCase() === q);
-    if (found) goStock(found);
+    if (!q) return;
+    // Search live index first, fall back to local stocks
+    const source = searchIndex.length > 0 ? searchIndex : stocks;
+    const found = source.find(s => s.ticker.toLowerCase() === q || s.name.toLowerCase() === q);
+    if (found) { goStock(found); return; }
+    // Also try partial name match
+    const partial = source.find(s => s.ticker.toLowerCase().includes(q) || s.name.toLowerCase().includes(q));
+    if (partial) { goStock(partial); return; }
+    // Try the search API (handles partial/fuzzy matches the local index might miss)
+    fetch(`${API}/search?q=${encodeURIComponent(query.trim())}&limit=1`)
+      .then(r => r.json())
+      .then(data => {
+        const results = Array.isArray(data) ? data : (data.results || []);
+        if (results.length > 0) { goStock(results[0]); return; }
+        // Last resort: try direct API lookup for an exact ticker
+        const upperQ = query.trim().toUpperCase();
+        fetch(`${API}/stock/${upperQ}`)
+          .then(r => r.json())
+          .then(detail => {
+            if (detail && detail.price) {
+              const synth = { ticker: upperQ, name: detail.name || upperQ, sector: detail.sector || "Stock", price: detail.price, change: detail.change || 0 };
+              goStock(synth);
+            }
+          })
+          .catch(() => {});
+      })
+      .catch(() => {});
   }
 
   function goLearnMetrics() {
@@ -475,29 +807,44 @@ function App() {
     ["leaderboard", "🏆", "Leaderboard"],
   ];
 
-  const sectors = ["Technology", "Energy", "Travel", "Healthcare", "Finance", "E-Commerce", "Consumer Goods", "Health & Fitness"];
+  const sectors = ["ETFs", "Technology", "Energy", "Travel", "Healthcare", "Finance", "E-Commerce", "Consumer Goods", "Health & Fitness"];
 
   async function handleAuthSubmit(e) {
     e.preventDefault();
     setAuthError("");
-
     try {
       if (authMode === "signup") {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        if (displayName.trim()) {
+          await updateProfile(cred.user, { displayName: displayName.trim() });
+          setUserName(displayName.trim());
+        }
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
-
-      setEmail("");
-      setPassword("");
+      setEmail(""); setPassword(""); setDisplayName("");
     } catch (error) {
-      setAuthError(error.message);
+      setAuthError(error.message.replace("Firebase: ", "").replace(/\(auth\/.*\)\.?/, "").trim());
     }
   }
 
   async function handleLogout() {
     await signOut(auth);
     setUserName("Guest");
+    setPage("account");
+  }
+
+  async function handleDeleteAccount() {
+    if (!confirmDelete) { setConfirmDelete(true); return; }
+    try {
+      await deleteUser(authUser);
+      setConfirmDelete(false);
+      setUserName("Guest");
+      setPage("account");
+    } catch (err) {
+      setAuthError("Please log out and log back in before deleting. (Firebase requires recent login)");
+      setConfirmDelete(false);
+    }
   }
 
   return (
@@ -505,7 +852,10 @@ function App() {
       {openMetric && <MetricModal metric={openMetric} onClose={() => setOpenMetric(null)} />}
 
       <aside className="sidebar">
-        <div className="brand">📈 StockSense</div>
+        <div className="brand">
+          <img src="/logo.png" alt="StockSense" className="brandLogo" />
+          StockSense
+        </div>
         {navItems.map(([id, icon, label]) => (
           <button key={id} className={`nav ${page === id ? "active" : ""}`} onClick={() => setPage(id)}>
             <span>{icon}</span>{label}
@@ -513,7 +863,7 @@ function App() {
         ))}
         <button className="userBox" onClick={() => setPage("account")}>
           <span className="avatar">👤</span>
-          <div><b>{userName}</b><small>Demo Account</small></div>
+          <div><b>{authUser ? userName : "Guest"}</b><small>{authUser ? "Signed in" : "Sign in →"}</small></div>
         </button>
       </aside>
 
@@ -521,16 +871,15 @@ function App() {
         {page === "dashboard" && (
           <>
             <div className="topbar">
-              <h1>{greeting}, {userName}! 👋</h1>
-              <div className="balance"><small>Demo Balance</small><b>$10,000.00</b></div>
+              <h1>{greeting}, {authUser ? userName : "there"}! 👋</h1>
             </div>
 
             {/* Market Overview Strip */}
             <div className="marketStrip">
               {[
                 { name: "S&P 500", value: "5,304.72", change: +0.51 },
-                { name: "NASDAQ", value: "16,742.39", change: +0.87 },
-                { name: "DOW", value: "39,069.53", change: +0.20 },
+                { name: "NASDAQ", value: "18,635.14", change: +0.73 },
+                { name: "DOW JONES", value: "42,051.06", change: +0.32 },
               ].map((idx) => (
                 <div className="marketStripItem" key={idx.name}>
                   <span className="marketStripName">{idx.name}</span>
@@ -598,27 +947,78 @@ function App() {
             <p>Search by company name or ticker. Example: Apple or AAPL.</p>
 
             <div className="searchWrap">
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Apple, AAPL, Tesla..." onKeyDown={e => e.key === "Enter" && searchStock()} />
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search Apple, AAPL, Tesla, VOO..." onKeyDown={e => e.key === "Enter" && searchStock()} />
               <button onClick={searchStock}>Search</button>
-              {suggestions.length > 0 && (
+              {query.trim().length > 0 && (
                 <div className="suggestions">
+                  {/* Popular universe results */}
                   {suggestions.map((s) => (
-                    <div key={s.ticker} onClick={() => goStock(s)}>
-                      <div className="suggestionRow">
+                    <div key={s.ticker} className="suggestionItem" onMouseDown={() => goStock(s)}>
+                      <div className="suggTickerBubble">{s.ticker[0]}</div>
+                      <div className="suggMid">
                         <span className="suggTicker">{s.ticker}</span>
                         <span className="suggName">{s.name}</span>
                       </div>
-                      <span className="suggSector">{s.sector}</span>
+                      <span className="suggSectorTag">{s.sector}</span>
                     </div>
                   ))}
+
+                  {/* Live search results — deduped so no duplicates with local results */}
+                  {dedupedLiveResults.map((s) => (
+                    <div key={s.ticker} className="suggestionItem suggestionLive" onMouseDown={() => goStock(s)}>
+                      <div className="suggTickerBubble liveTickerBubble">{s.ticker[0]}</div>
+                      <div className="suggMid">
+                        <span className="suggTicker">{s.ticker}</span>
+                        <span className="suggName">{s.name}</span>
+                      </div>
+                      <span className="suggSectorTag liveSectorTag">
+                        {s.price != null ? `$${s.price}` : s.sector}
+                      </span>
+                    </div>
+                  ))}
+
+                  {/* Fallback prompt — shown when no local results and live search not yet triggered */}
+                  {suggestions.length === 0 && !liveSearched && !liveLoading && (
+                    <div className="suggFallback" onMouseDown={triggerLiveSearch}>
+                      <span className="suggFallbackIcon">🔍</span>
+                      <div className="suggFallbackText">
+                        <span>Can't find "<b>{query}</b>"?</span>
+                        <small>Search all markets including penny stocks →</small>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Loading spinner while live search runs */}
+                  {liveLoading && (
+                    <div className="suggLiveLoading">
+                      <span className="suggLiveSpinner" /> Searching all markets...
+                    </div>
+                  )}
+
+                  {/* No results at all after live search */}
+                  {liveSearched && !liveLoading && dedupedLiveResults.length === 0 && suggestions.length === 0 && (
+                    <div className="suggNoResults">
+                      No results found for "<b>{query}</b>" — check the ticker and try again.
+                    </div>
+                  )}
+
+                  {/* After local results, show live search option */}
+                  {suggestions.length > 0 && !liveSearched && !liveLoading && (
+                    <div className="suggFallbackSmall" onMouseDown={triggerLiveSearch}>
+                      🔍 Search all markets for "<b>{query}</b>" →
+                    </div>
+                  )}
                 </div>
               )}
             </div>
 
-            <h3>Daily Top Movers</h3>
+            <h3 style={{marginBottom: "12px"}}>Daily Top Movers</h3>
+            {moversLoading ? (
+              <div className="moversLoading">Loading live market data...</div>
+            ) : (
             <div className="moversGrid">
               <div className="moversPanel">
-                <div className="moversPanelHeader gainers">▲ Top Gainers</div>
+              <div className="moversPanelHeader gainers">▲ Top Gainers</div>
                 {topGainers.map((s) => (
                   <div className="stockRow" key={s.ticker} onClick={() => goStock(s)}>
                     <b className="stockRowName">
@@ -644,6 +1044,7 @@ function App() {
                 ))}
               </div>
             </div>
+            )}
 
             <div className="sectionGap" />
 
@@ -657,15 +1058,20 @@ function App() {
                 ))}
               </div>
               <div className="sectorList">
-                {stocks.filter((s) => s.sector === selectedSector).slice(0, 5).map((s) => (
+                {sectorLoading
+                  ? <div className="moversLoading">Loading trending stocks...</div>
+                  : (sectorStocks.length > 0 ? sectorStocks : stocks.filter(s => s.sector === selectedSector))
+                    .map((s) => (
                   <div className="sectorStock" key={s.ticker} onClick={() => goStock(s)}>
                     <div className="logoBubble">{s.ticker[0]}</div>
-                    <div>
+                    <div className="sectorStockInfo">
                       <b className="rowTicker">{s.ticker}</b>
                       <small className="rowName">{s.name}</small>
                     </div>
-                    <span>${s.price}</span>
-                    <span className={s.change >= 0 ? "green" : "red"}>{s.change >= 0 ? "▲" : "▼"} {Math.abs(s.change)}%</span>
+                    <div className="sectorStockRight">
+                      <span className="sectorPrice">${s.price ?? "—"}</span>
+                      <span className={s.change >= 0 ? "green sectorChange" : "red sectorChange"}>{s.change >= 0 ? "▲" : "▼"} {Math.abs(s.change ?? 0)}%</span>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -676,7 +1082,8 @@ function App() {
             <h3>Recent Searches</h3>
             <div className="chips">
               {recent.map((t) => {
-                const s = stocks.find((x) => x.ticker === t);
+                const source = searchIndex.length > 0 ? searchIndex : stocks;
+                const s = source.find((x) => x.ticker === t);
                 return (
                   <button key={t} onClick={() => s && goStock(s)} className="chipBtn">
                     <span className="chipTicker">{t}</span>
@@ -688,7 +1095,7 @@ function App() {
 
             <h3>Trending Searches</h3>
             <div className="chips">
-              {stocks.slice().sort((a, b) => b.popularity - a.popularity).slice(0, 8).map(s => (
+              {(searchIndex.length > 0 ? searchIndex : stocks).slice(0, 8).map(s => (
                 <button key={s.ticker} onClick={() => goStock(s)} className="chipBtn">
                   <span className="chipTicker">{s.ticker}</span>
                   <span className="chipName">{s.name}</span>
@@ -702,30 +1109,88 @@ function App() {
           <section className="page">
             <button className="backBtn" onClick={() => setPage("search")}>← Back</button>
             <h1>
-              <span className="stockPageName">{selectedStock.name}</span>
+              <span className="stockPageName">{stockDetail?.name || selectedStock.name}</span>
               <span className="stockPageTicker">{selectedStock.ticker}</span>
             </h1>
+            {stockLoading && <div className="moversLoading">Loading live data...</div>}
+            {stockDetail && (
+              <div className="stockPriceRow">
+                <span className="stockBigPrice">{stockDetail.price_fmt}</span>
+                <span className={stockDetail.change >= 0 ? "green stockBigChange" : "red stockBigChange"}>
+                  {stockDetail.change >= 0 ? "▲" : "▼"} {Math.abs(stockDetail.change)}% ({stockDetail.change_abs >= 0 ? "+" : ""}{stockDetail.change_abs})
+                </span>
+              </div>
+            )}
 
             <div className="timeframes">
-              {["1D", "1W", "1M", "3M", "YTD", "1Y", "5Y"].map((t) => (
-                <button key={t} className={timeFrame === t ? "selected" : ""} onClick={() => setTimeFrame(t)}>{t}</button>
+              {TIMEFRAMES.map((t) => (
+                <button key={t.label} className={timeFrame === t.label ? "selected" : ""} onClick={() => setTimeFrame(t.label)}>{t.label}</button>
               ))}
             </div>
 
             <div className="stockPageGrid">
               <div className="card stockChartCard">
-                <h3>Historical Price Chart</h3>
-                <div className="largeChart">📈</div>
-                <p>Selected range: {timeFrame}. Real chart connects after backend integration.</p>
+                <div className="chartHeader">
+                  <div>
+                    <h3>{stockDetail?.name || selectedStock.name || selectedStock.ticker}</h3>
+                    {chartData && !chartData.error && (
+                      <span className={chartData.period_change >= 0 ? "green chartPeriodChange" : "red chartPeriodChange"}>
+                        {chartData.period_change >= 0 ? "▲" : "▼"} {Math.abs(chartData.period_change)}% this period
+                      </span>
+                    )}
+                  </div>
+                  {hoverInfo && (
+                    <div className="chartHoverBadge">
+                      <span className="chartHoverPrice">${hoverInfo.price?.toFixed(2)}</span>
+                      <span className="chartHoverLabel">{hoverInfo.label}</span>
+                      <span className={`chartHoverPct ${hoverInfo.pctChange >= 0 ? "green" : "red"}`}>
+                        {hoverInfo.pctChange >= 0 ? "▲" : "▼"} {Math.abs(hoverInfo.pctChange).toFixed(2)}%
+                      </span>
+                    </div>
+                  )}
+                </div>
+                {chartLoading && <div className="chartLoading">Loading chart...</div>}
+                {!chartLoading && chartData?.error && (
+                  <div className="chartNoData">No data for this range — intraday (5m/15m/1h) is unavailable on weekends or after market hours.</div>
+                )}
+                <div className="chartWrap" style={{ display: chartLoading || chartData?.error ? "none" : "block" }}>
+                  <canvas
+                    ref={canvasRef}
+                    className="realChart"
+                    onMouseMove={handleChartMouseMove}
+                    onMouseLeave={handleChartMouseLeave}
+                  />
+                  {hoverInfo && (
+                    <div className="chartCrosshair" style={{ left: hoverInfo.x }}>
+                      <div className="chartCrosshairDot" style={{ top: hoverInfo.y }} />
+                    </div>
+                  )}
+                </div>
               </div>
 
               <div className="card stockMetricsCard">
                 <div className="keyMetricsHeader">
                   <h3>Key Metrics</h3>
-                  <button className="viewGuideBtn" onClick={(e) => { e.stopPropagation(); setLearnSection("metrics"); setPage("learn"); }}>View full guide →</button>
+                  <button className="viewGuideBtn" onClick={() => { setLearnSection("metrics"); setPage("learn"); }}>View full guide →</button>
                 </div>
 
-                {metricInfo.map((m) => (
+                {metricInfo.map((m) => {
+                  const liveValues = {
+                    price:    stockDetail?.price_fmt,
+                    pe:       stockDetail?.pe_fmt,
+                    marketCap: stockDetail?.market_cap_fmt,
+                    volume:   stockDetail?.volume_fmt,
+                    dividend: stockDetail?.div_yield_fmt,
+                    eps:      stockDetail?.eps_fmt,
+                    highlow:  stockDetail?.week52_high && stockDetail?.week52_low
+                                ? `$${stockDetail.week52_low.toFixed(2)} – $${stockDetail.week52_high.toFixed(2)}`
+                                : stockDetail?.week52_fmt,
+                    beta:     stockDetail?.beta_fmt,
+                    debt:     stockDetail?.debt_to_equity_fmt,
+                    roe:      stockDetail?.roe_fmt,
+                  };
+                  const displayValue = liveValues[m.key] ?? m.value;
+                  return (
                   <div key={m.key} className="metricLine">
                     <b>
                       {m.name}
@@ -733,9 +1198,10 @@ function App() {
                         <span className="metricBubbleTip">{m.short}</span>
                       </button>
                     </b>
-                    <span className="metricValue">{m.value}</span>
+                    <span className="metricValue">{displayValue}</span>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </section>
@@ -828,29 +1294,66 @@ function App() {
             <div className="card account">
               {authUser ? (
                 <>
-                  <h3>Logged in</h3>
-                  <p>You are signed in as:</p>
-                  <h2>{authUser.email}</h2>
+                  <div className="accountAvatar">{(userName || "?")[0].toUpperCase()}</div>
+                  <h2 className="accountName">{userName}</h2>
+                  <p className="accountEmail">{authUser.email}</p>
 
-                  <label>Display Name</label>
-                  <input
-                    value={userName}
-                    onChange={(e) => setUserName(e.target.value)}
-                  />
+                  <div className="accountField">
+                    <label>Display Name</label>
+                    <div className="accountFieldRow">
+                      <input value={userName} onChange={(e) => setUserName(e.target.value)} />
+                      <button className="saveNameBtn" onClick={async () => {
+                        if (authUser && userName.trim()) {
+                          await updateProfile(authUser, { displayName: userName.trim() });
+                        }
+                      }}>Save</button>
+                    </div>
+                  </div>
 
-                  <label>Account Type</label>
-                  <input value="Firebase Email/Password Account" readOnly />
+                  <div className="accountField">
+                    <label>Email</label>
+                    <input value={authUser.email} readOnly className="readonlyInput"/>
+                  </div>
 
-                  <button onClick={handleLogout}>Logout</button>
+                  <div className="accountField">
+                    <label>Account Type</label>
+                    <input value="Email / Password" readOnly className="readonlyInput"/>
+                  </div>
+
+                  {authError && <p className="authError">{authError}</p>}
+
+                  <button className="logoutBtn" onClick={handleLogout}>Log Out</button>
+
+                  <div className="dangerZone">
+                    <p className="dangerLabel">Danger Zone</p>
+                    {confirmDelete
+                      ? <div className="confirmDeleteRow">
+                          <span>Are you sure? This cannot be undone.</span>
+                          <button className="deleteBtn" onClick={handleDeleteAccount}>Yes, delete</button>
+                          <button className="cancelDeleteBtn" onClick={() => setConfirmDelete(false)}>Cancel</button>
+                        </div>
+                      : <button className="deleteBtn" onClick={handleDeleteAccount}>Delete Account</button>
+                    }
+                  </div>
                 </>
               ) : (
                 <>
-                  <h3>{authMode === "login" ? "Login" : "Create Account"}</h3>
-                  <p>
-                    Sign in to save your StockSense demo account and future portfolio data.
-                  </p>
+                  <h3>{authMode === "login" ? "Welcome back" : "Create your account"}</h3>
+                  <p>Sign in to save your StockSense profile and future portfolio data.</p>
 
                   <form onSubmit={handleAuthSubmit}>
+                    {authMode === "signup" && (
+                      <>
+                        <label>Display Name</label>
+                        <input
+                          type="text"
+                          value={displayName}
+                          placeholder="What should we call you?"
+                          onChange={(e) => setDisplayName(e.target.value)}
+                          required
+                        />
+                      </>
+                    )}
                     <label>Email</label>
                     <input
                       type="email"
@@ -859,7 +1362,6 @@ function App() {
                       onChange={(e) => setEmail(e.target.value)}
                       required
                     />
-
                     <label>Password</label>
                     <input
                       type="password"
@@ -868,23 +1370,14 @@ function App() {
                       onChange={(e) => setPassword(e.target.value)}
                       required
                     />
-
                     {authError && <p className="authError">{authError}</p>}
-
-                    <button type="submit">
-                      {authMode === "login" ? "Login" : "Sign Up"}
+                    <button type="submit" className="authSubmitBtn">
+                      {authMode === "login" ? "Log In" : "Create Account"}
                     </button>
                   </form>
 
-                  <button
-                    className="switchAuthBtn"
-                    onClick={() =>
-                      setAuthMode(authMode === "login" ? "signup" : "login")
-                    }
-                  >
-                    {authMode === "login"
-                      ? "New user? Create an account"
-                      : "Already have an account? Login"}
+                  <button className="switchAuthBtn" onClick={() => { setAuthMode(authMode === "login" ? "signup" : "login"); setAuthError(""); }}>
+                    {authMode === "login" ? "New here? Create an account →" : "Already have an account? Log in →"}
                   </button>
                 </>
               )}

@@ -25,6 +25,7 @@ body {
 
 .sidebar {
   width: 260px;
+  min-width: 260px;
   background: rgba(255, 255, 255, 0.7);
   backdrop-filter: blur(12px);
   border-right: 1px solid #dce7dc;
@@ -32,13 +33,30 @@ body {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
 }
 
 .brand {
-  font-size: 2rem;
+  font-size: 1.6rem;
   font-weight: 800;
   color: #1f5f41;
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.brandLogo {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 
 .nav {
@@ -1684,6 +1702,15 @@ body {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 14px;
+  gap: 8px;
+}
+
+.keyMetricsHeader h3 {
+  flex-shrink: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .viewGuideBtn {
@@ -1696,6 +1723,12 @@ body {
   font-weight: 700;
   cursor: pointer;
   transition: 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  position: relative;
+  z-index: 1;
 }
 
 .viewGuideBtn:hover {
@@ -1733,7 +1766,8 @@ body {
 .metricBubbleTip {
   display: none;
   position: absolute;
-  left: 26px;
+  right: 26px;
+  left: auto;
   top: 50%;
   transform: translateY(-50%);
   width: 200px;
@@ -1746,7 +1780,7 @@ body {
   font-weight: 400;
   line-height: 1.45;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
-  z-index: 50;
+  z-index: 10;
   pointer-events: none;
 }
 
@@ -1758,6 +1792,15 @@ body {
   font-weight: 700;
   color: #173427;
   font-size: 0.95rem;
+  white-space: nowrap;
+  text-align: right;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+
+.metricLine b {
+  flex: 1;
+  min-width: 0;
 }
 
 /* ── LEARN PAGE metric cards ── */
@@ -2100,3 +2143,299 @@ body {
   margin-top: 12px !important;
   box-shadow: none !important;
 }
+/* ── Live data loading & stock price row ── */
+.moversLoading {
+  padding: 24px;
+  text-align: center;
+  color: #8a9e90;
+  font-size: 0.9rem;
+  background: rgba(255,255,255,0.6);
+  border-radius: 16px;
+  margin-bottom: 12px;
+}
+
+.stockPriceRow {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.stockBigPrice {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #173427;
+}
+
+.stockBigChange {
+  font-size: 1rem;
+  font-weight: 700;
+}
+/* ── REAL CHART ── */
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.chartPeriodChange { font-size: 0.9rem; font-weight: 700; }
+
+.chartWrap {
+  position: relative;
+  width: 100%;
+  margin-top: 14px;
+}
+
+.realChart {
+  width: 100%;
+  height: 420px;
+  display: block;
+  border-radius: 8px;
+  cursor: crosshair;
+}
+
+.chartCrosshair {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: rgba(31, 125, 76, 0.4);
+  pointer-events: none;
+  transform: translateX(-50%);
+}
+
+.chartCrosshairDot {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 10px;
+  height: 10px;
+  background: #1a9e5c;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+}
+
+.chartHoverBadge {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  background: #f0faf4;
+  border: 1px solid #c8e8d4;
+  border-radius: 12px;
+  padding: 8px 16px;
+  min-width: 110px;
+}
+.chartHoverPrice {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: #173427;
+  line-height: 1.2;
+}
+.chartHoverLabel {
+  font-size: 0.8rem;
+  color: #7d8f84;
+  margin-top: 1px;
+}
+.chartHoverPct {
+  font-size: 0.88rem;
+  font-weight: 700;
+  margin-top: 3px;
+}
+
+.chartHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chartLoading {
+  height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a9e90;
+  font-size: 0.9rem;
+}
+
+.chartNoData {
+  height: 420px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a9e90;
+  font-size: 0.85rem;
+  text-align: center;
+  padding: 0 32px;
+}
+
+@media (max-width: 900px) {
+  .realChart { height: 260px; }
+  .chartLoading, .chartNoData { height: 260px; }
+}
+
+/* ── SUGGESTIONS REDESIGN ── */
+.suggestionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid #f0f4f0;
+  transition: background 0.15s;
+}
+.suggestionItem:last-child { border-bottom: none; }
+.suggestionItem:hover { background: #f3faf5; }
+
+/* Live search result rows — subtle blue tint to differentiate */
+.suggestionLive { background: #f7fbff; }
+.suggestionLive:hover { background: #eef6ff; }
+.liveTickerBubble {
+  background: linear-gradient(135deg, #2563eb, #60a5fa) !important;
+}
+.liveSectorTag {
+  background: #dbeafe !important;
+  color: #1d4ed8 !important;
+}
+
+/* "Can't find X? Search all markets →" prompt */
+.suggFallback {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  cursor: pointer;
+  border-radius: 10px;
+  margin: 4px;
+  background: linear-gradient(135deg, #f0f9f4, #e8f5ec);
+  border: 1.5px dashed #a8d5bc;
+  transition: background 0.15s, border-color 0.15s;
+}
+.suggFallback:hover {
+  background: linear-gradient(135deg, #e2f5ea, #d4f0dd);
+  border-color: #1f7d4c;
+}
+.suggFallbackIcon { font-size: 1.2rem; }
+.suggFallbackText { display: flex; flex-direction: column; gap: 2px; }
+.suggFallbackText span { font-size: 0.88rem; color: #1f7d4c; font-weight: 600; }
+.suggFallbackText small { font-size: 0.75rem; color: #6a9e80; }
+
+/* Slim "search all markets" row shown below existing local results */
+.suggFallbackSmall {
+  padding: 10px 14px;
+  font-size: 0.8rem;
+  color: #2563eb;
+  cursor: pointer;
+  border-top: 1px solid #e8f0ee;
+  background: #f7fbff;
+  border-radius: 0 0 12px 12px;
+  transition: background 0.15s;
+}
+.suggFallbackSmall:hover { background: #eef6ff; }
+.suggFallbackSmall b { font-weight: 700; }
+
+/* Loading state */
+.suggLiveLoading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  font-size: 0.85rem;
+  color: #6a9e80;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+.suggLiveSpinner {
+  display: inline-block;
+  width: 14px; height: 14px;
+  border: 2px solid #c8e8d4;
+  border-top-color: #1f7d4c;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+/* No results */
+.suggNoResults {
+  padding: 14px 16px;
+  font-size: 0.85rem;
+  color: #9aada3;
+  text-align: center;
+}
+.suggNoResults b { color: #173427; }
+
+.suggTickerBubble {
+  width: 34px; height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #1f7d4c, #2ecc71);
+  color: white;
+  font-weight: 800;
+  font-size: 0.9rem;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.suggMid {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.suggTicker { font-weight: 800; font-size: 0.9rem; color: #173427; white-space: nowrap; }
+.suggName { font-size: 0.78rem; color: #7a9488; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.suggSectorTag {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #edf4ee;
+  color: #3a7d55;
+  padding: 3px 8px;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── SECTOR LIST SCROLLABLE ── */
+.sectorList {
+  max-height: 420px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: #cde8d5 transparent;
+}
+.sectorStockInfo { flex: 1; min-width: 0; }
+.sectorStockRight { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; flex-shrink: 0; }
+.sectorPrice { font-weight: 700; font-size: 0.92rem; color: #173427; }
+.sectorChange { font-size: 0.82rem; font-weight: 700; }
+
+/* ── ACCOUNT PAGE ── */
+.accountAvatar {
+  width: 72px; height: 72px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #1f7d4c, #2ecc71);
+  color: white;
+  font-size: 2rem;
+  font-weight: 800;
+  display: flex; align-items: center; justify-content: center;
+  margin: 0 auto 14px;
+}
+.accountName { text-align: center; font-size: 1.5rem; margin-bottom: 4px; }
+.accountEmail { text-align: center; color: #8a9e90; font-size: 0.88rem; margin-bottom: 24px; }
+.accountField { margin-bottom: 16px; }
+.accountField label { display: block; font-size: 0.8rem; font-weight: 700; color: #5a7868; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
+.accountFieldRow { display: flex; gap: 8px; }
+.accountFieldRow input { flex: 1; }
+.saveNameBtn { background: #1f7d4c; color: white; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+.readonlyInput { background: #f5f8f5; color: #8a9e90; cursor: default; }
+.logoutBtn { width: 100%; padding: 14px; background: #edf4ee; color: #1f7d4c; border: none; border-radius: 16px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 8px; }
+.logoutBtn:hover { background: #d4ead9; }
+.dangerZone { margin-top: 24px; padding-top: 20px; border-top: 1px solid #f0e8e8; }
+.dangerLabel { font-size: 0.75rem; font-weight: 800; text-transform: uppercase; color: #c0392b; letter-spacing: 0.06em; margin-bottom: 10px; }
+.deleteBtn { background: #e74c3c; color: white; border: none; border-radius: 14px; padding: 12px 20px; font-weight: 700; cursor: pointer; font-size: 0.9rem; }
+.deleteBtn:hover { background: #c0392b; }
+.cancelDeleteBtn { background: #eee; color: #555; border: none; border-radius: 14px; padding: 12px 20px; font-weight: 700; cursor: pointer; font-size: 0.9rem; margin-left: 8px; }
+.confirmDeleteRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.confirmDeleteRow span { font-size: 0.85rem; color: #555; }
+.authSubmitBtn { width: 100%; padding: 14px; background: linear-gradient(135deg, #1f7d4c, #2ecc71); color: white; border: none; border-radius: 16px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 8px; }
