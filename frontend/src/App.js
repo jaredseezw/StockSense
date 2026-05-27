@@ -466,7 +466,7 @@ function App() {
       setInsightIndex(i => (i + 1) % dailyInsights.length);
     }, 8000);
     return () => clearInterval(timer);
-  }, []);
+  }, [dailyInsights.length]);
 
   // Fetch search index once on mount — used for autocomplete
   // Merges API results with local stocks so local data always works even if API is down
@@ -794,10 +794,6 @@ function App() {
       .catch(() => {});
   }
 
-  function goLearnMetrics() {
-    setLearnSection("metrics");
-    setPage("learn");
-  }
 
   const navItems = [
     ["dashboard", "📊", "Dashboard"],
