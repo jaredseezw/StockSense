@@ -111,8 +111,14 @@ def fetch_stock_detail(ticker: str) -> dict:
     ticker = ticker.upper()
     t = _ticker(ticker)
 
-    # Stable real data from yfinance history
-    hist = t.history(period="1y", interval="1d", auto_adjust=True)
+    hist = yf.download(
+    ticker,
+    period="1y",
+    interval="1d",
+    auto_adjust=True,
+    progress=False,
+    threads=False
+)
 
     if hist.empty:
         raise ValueError(f"No stock data found for {ticker}")
@@ -245,7 +251,14 @@ def fetch_chart(ticker: str, timeframe: str = "1M") -> dict:
     period, interval = CHART_PARAMS.get(timeframe, ("1mo", "1d"))
     t = _ticker(ticker)
 
-    hist = t.history(period=period, interval=interval, auto_adjust=True)
+    hist = yf.download(
+        ticker,
+        period=period,
+        interval=interval,
+        auto_adjust=True,
+        progress=False,
+        threads=False
+    )
 
     if hist.empty:
         return {"error": "No chart data available", "ticker": ticker, "timeframe": timeframe}
@@ -339,7 +352,14 @@ def fetch_volume_history(ticker: str) -> dict:
     }
     """
     t = _ticker(ticker)
-    hist = t.history(period="3mo", interval="1d", auto_adjust=True)
+    hist = yf.download(
+        ticker,
+        period="3mo",
+        interval="1d",
+        auto_adjust=True,
+        progress=False,
+        threads=False
+    )
 
     if hist.empty:
         return {}
