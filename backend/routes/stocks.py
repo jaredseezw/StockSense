@@ -55,7 +55,7 @@ def get_chart(ticker: str):
     ticker    = ticker.upper()
     timeframe = request.args.get("range", "1M").upper()
 
-    valid_ranges = {"1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "ALL"}
+    valid_ranges = {"5M", "15M", "1H", "1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "ALL"}
     if timeframe not in valid_ranges:
         return jsonify({"error": f"Invalid range. Use one of: {', '.join(valid_ranges)}"}), 400
 

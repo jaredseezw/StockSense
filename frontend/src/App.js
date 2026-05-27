@@ -26,16 +26,18 @@ const SECTOR_UNIVERSE = {
   "Health & Fitness":["PTON","LULU","PLNT","NKE","GRMN","DXCM","ISRG","SYK","EW","HOLX"],
 };
 
-// All timeframes with yfinance params
 const TIMEFRAMES = [
-  { label: "1D",  period: "1d",   interval: "5m"  },   // intraday — shows time
-  { label: "1W",  period: "5d",   interval: "1d"  },   // 5 trading days — shows date
-  { label: "1M",  period: "1mo",  interval: "1d"  },
-  { label: "3M",  period: "3mo",  interval: "1d"  },
-  { label: "YTD", period: "ytd",  interval: "1d"  },
-  { label: "1Y",  period: "1y",   interval: "1d"  },
-  { label: "5Y",  period: "5y",   interval: "1wk" },
-  { label: "All", period: "max",  interval: "1mo" },
+  { label: "5M",  display: "5m"  },
+  { label: "15M", display: "15m" },
+  { label: "1H",  display: "1h"  },
+  { label: "1D",  display: "1D"  },
+  { label: "1W",  display: "1W"  },
+  { label: "1M",  display: "1M"  },
+  { label: "3M",  display: "3M"  },
+  { label: "YTD", display: "YTD" },
+  { label: "1Y",  display: "1Y"  },
+  { label: "5Y",  display: "5Y"  },
+  { label: "ALL", display: "All" },
 ];
 
 const stocks = [
@@ -1113,18 +1115,21 @@ function App() {
               <span className="stockPageTicker">{selectedStock.ticker}</span>
             </h1>
             {stockLoading && <div className="moversLoading">Loading live data...</div>}
-            {stockDetail && (
+            {stockDetail && stockDetail.price && (
               <div className="stockPriceRow">
                 <span className="stockBigPrice">{stockDetail.price_fmt}</span>
-                <span className={stockDetail.change >= 0 ? "green stockBigChange" : "red stockBigChange"}>
-                  {stockDetail.change >= 0 ? "▲" : "▼"} {Math.abs(stockDetail.change)}% ({stockDetail.change_abs >= 0 ? "+" : ""}{stockDetail.change_abs})
-                </span>
+                {stockDetail.change != null && (
+                  <span className={stockDetail.change >= 0 ? "green stockBigChange" : "red stockBigChange"}>
+                    {stockDetail.change >= 0 ? "▲" : "▼"} {Math.abs(stockDetail.change).toFixed(2)}%
+                    {stockDetail.change_abs != null && ` (${stockDetail.change_abs >= 0 ? "+" : ""}${stockDetail.change_abs})`}
+                  </span>
+                )}
               </div>
             )}
 
             <div className="timeframes">
               {TIMEFRAMES.map((t) => (
-                <button key={t.label} className={timeFrame === t.label ? "selected" : ""} onClick={() => setTimeFrame(t.label)}>{t.label}</button>
+                <button key={t.label} className={timeFrame === t.label ? "selected" : ""} onClick={() => setTimeFrame(t.label)}>{t.display}</button>
               ))}
             </div>
 
@@ -1171,7 +1176,7 @@ function App() {
               <div className="card stockMetricsCard">
                 <div className="keyMetricsHeader">
                   <h3>Key Metrics</h3>
-                  <button className="viewGuideBtn" onClick={() => { setLearnSection("metrics"); setPage("learn"); }}>View full guide →</button>
+                  <button className="viewGuideBtn" onClick={(e) => { e.stopPropagation(); e.preventDefault(); setLearnSection("metrics"); setPage("learn"); }}>View full guide →</button>
                 </div>
 
                 {metricInfo.map((m) => {
@@ -1189,7 +1194,7 @@ function App() {
                     debt:     stockDetail?.debt_to_equity_fmt,
                     roe:      stockDetail?.roe_fmt,
                   };
-                  const displayValue = liveValues[m.key] ?? m.value;
+                  const displayValue = stockDetail ? (liveValues[m.key] ?? "N/A") : "—";
                   return (
                   <div key={m.key} className="metricLine">
                     <b>

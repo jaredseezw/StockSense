@@ -13,50 +13,10 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import math
-import requests
-import time
-
-# ---------------------------------------------------------------------------
-# yfinance session fix — Yahoo Finance blocks requests without valid cookies.
-# We share one session with browser-like headers across all yf.Ticker calls.
-# This eliminates 401 "Invalid Crumb" errors.
-# ---------------------------------------------------------------------------
-
-_YF_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Connection": "keep-alive",
-}
-
-_session = None
-_session_created_at = 0.0
-_SESSION_TTL = 1800  # re-create session every 30 min
-
-
-def _get_session() -> requests.Session:
-    """Return a cached requests.Session with fresh Yahoo Finance cookies."""
-    global _session, _session_created_at
-    now = time.time()
-    if _session is None or (now - _session_created_at) > _SESSION_TTL:
-        s = requests.Session()
-        s.headers.update(_YF_HEADERS)
-        try:
-            s.get("https://finance.yahoo.com", timeout=10)
-        except Exception:
-            pass
-        _session = s
-        _session_created_at = now
-    return _session
-
 
 def _ticker(symbol: str) -> yf.Ticker:
-    """Create a yf.Ticker using the shared authenticated session."""
-    return _ticker(symbol, session=_get_session())
+    """Create a yf.Ticker — let yfinance handle auth itself."""
+    return yf.Ticker(symbol)
 
 # ---------------------------------------------------------------------------
 # Internal helpers
