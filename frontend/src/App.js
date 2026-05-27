@@ -10,7 +10,8 @@ import {
   deleteUser,
 } from "firebase/auth";
 
-const API = "http://localhost:8000/api";
+const API =
+  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 // Expanded sector universe - 10 well-known tickers per sector
 // Backend will fetch live prices + sort by volume ratio (trending)
@@ -27,9 +28,6 @@ const SECTOR_UNIVERSE = {
 };
 
 const TIMEFRAMES = [
-  { label: "5M",  display: "5m"  },
-  { label: "15M", display: "15m" },
-  { label: "1H",  display: "1h"  },
   { label: "1D",  display: "1D"  },
   { label: "1W",  display: "1W"  },
   { label: "1M",  display: "1M"  },

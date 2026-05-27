@@ -13,6 +13,7 @@ import yfinance as yf
 import pandas as pd
 from datetime import datetime, timedelta
 import math
+import requests
 
 def _ticker(symbol: str) -> yf.Ticker:
     """Create a yf.Ticker — let yfinance handle auth itself."""
@@ -21,6 +22,22 @@ def _ticker(symbol: str) -> yf.Ticker:
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
+HEADERS = {"User-Agent": "Mozilla/5.0"}
+
+def _yahoo_quote(ticker: str) -> dict:
+    url = f"https://query1.finance.yahoo.com/v7/finance/quote?symbols={ticker.upper()}"
+    res = requests.get(url, headers=HEADERS, timeout=10)
+    res.raise_for_status()
+
+    data = res.json()
+    results = data.get("quoteResponse", {}).get("result", [])
+
+    if not results:
+        raise ValueError(f"No quote data found for {ticker}")
+
+    return results[0]
+
 
 def _safe(value, default=None):
     """Return default if value is NaN / None / inf."""
@@ -62,32 +79,27 @@ def _fmt_volume(n):
 # ---------------------------------------------------------------------------
 
 def fetch_quote(ticker: str) -> dict:
-    """
-    Returns the data needed for search results and stock list rows.
-    {ticker, name, sector, price, change, change_abs, market_cap_fmt}
-    """
-    t = _ticker(ticker)
-    info = t.info
+    q = _yahoo_quote(ticker)
 
-    price = _safe(info.get("currentPrice") or info.get("regularMarketPrice"))
-    prev  = _safe(info.get("previousClose") or info.get("regularMarketPreviousClose"))
+    price = _safe(q.get("regularMarketPrice"))
+    prev = _safe(q.get("regularMarketPreviousClose"))
 
     change_abs = round(price - prev, 2) if price and prev else None
     change_pct = round((price - prev) / prev * 100, 2) if price and prev else None
 
     return {
-        "ticker":      ticker.upper(),
-        "name":        info.get("longName") or info.get("shortName") or ticker,
-        "sector":      info.get("sector", "Unknown"),
-        "industry":    info.get("industry", "Unknown"),
-        "price":       _safe(price),
-        "change":      _safe(change_pct),       # e.g. 1.18  (percent)
-        "change_abs":  _safe(change_abs),       # e.g. 2.04  (dollars)
-        "market_cap":  _safe(info.get("marketCap")),
-        "market_cap_fmt": _fmt_large(info.get("marketCap")),
-        "volume":      _safe(info.get("volume")),
-        "volume_fmt":  _fmt_volume(info.get("volume")),
-        "logo_url":    info.get("logo_url"),
+        "ticker": ticker.upper(),
+        "name": q.get("longName") or q.get("shortName") or ticker.upper(),
+        "sector": "Unknown",
+        "industry": "Unknown",
+        "price": price,
+        "change": change_pct,
+        "change_abs": change_abs,
+        "market_cap": _safe(q.get("marketCap")),
+        "market_cap_fmt": _fmt_large(q.get("marketCap")),
+        "volume": _safe(q.get("regularMarketVolume")),
+        "volume_fmt": _fmt_volume(q.get("regularMarketVolume")),
+        "logo_url": None,
     }
 
 
@@ -96,33 +108,46 @@ def fetch_quote(ticker: str) -> dict:
 # ---------------------------------------------------------------------------
 
 def fetch_stock_detail(ticker: str) -> dict:
-    """
-    Returns everything needed to populate the stock page and metric cards.
-    Includes formatted display strings that match what the frontend shows.
-    """
+    ticker = ticker.upper()
     t = _ticker(ticker)
-    info = t.info
 
-    # --- Raw values ---
-    price       = _safe(info.get("currentPrice") or info.get("regularMarketPrice"))
-    prev        = _safe(info.get("previousClose") or info.get("regularMarketPreviousClose"))
-    pe          = _safe(info.get("trailingPE"))
-    market_cap  = _safe(info.get("marketCap"))
-    volume      = _safe(info.get("volume"))
-    avg_volume  = _safe(info.get("averageVolume"))
-    div_yield   = _safe(info.get("dividendYield"))   # decimal e.g. 0.006
-    eps         = _safe(info.get("trailingEps"))
-    week52_high = _safe(info.get("fiftyTwoWeekHigh"))
-    week52_low  = _safe(info.get("fiftyTwoWeekLow"))
-    beta        = _safe(info.get("beta"))
-    debt_eq     = _safe(info.get("debtToEquity"))    # yfinance gives this as %
-    roe         = _safe(info.get("returnOnEquity"))  # decimal e.g. 0.22
+    # Stable real data from yfinance history
+    hist = t.history(period="1y", interval="1d", auto_adjust=True)
 
-    # --- Change ---
-    change_abs = round(price - prev, 2) if price and prev else None
-    change_pct = round((price - prev) / prev * 100, 2) if price and prev else None
+    if hist.empty:
+        raise ValueError(f"No stock data found for {ticker}")
 
-    # --- Market cap classification ---
+    price = float(hist["Close"].iloc[-1])
+    prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else None
+    volume = int(hist["Volume"].iloc[-1]) if "Volume" in hist else None
+    week52_high = float(hist["High"].max())
+    week52_low = float(hist["Low"].min())
+
+    change_abs = round(price - prev, 2) if prev else None
+    change_pct = round((price - prev) / prev * 100, 2) if prev else None
+
+    # Optional info. If Yahoo blocks it, don't crash.
+    info = {}
+    try:
+        info = t.info or {}
+    except Exception:
+        info = {}
+
+    pe = _safe(info.get("trailingPE"))
+    market_cap = _safe(info.get("marketCap"))
+    avg_volume = _safe(info.get("averageVolume"))
+    div_yield = _safe(info.get("dividendYield"))
+    eps = _safe(info.get("trailingEps"))
+    beta = _safe(info.get("beta"))
+    debt_eq = _safe(info.get("debtToEquity"))
+    roe = _safe(info.get("returnOnEquity"))
+
+    if debt_eq and debt_eq > 20:
+        debt_eq = round(debt_eq / 100, 2)
+
+    div_yield_pct = round(div_yield * 100, 2) if div_yield and div_yield < 1 else div_yield
+    roe_pct = round(roe * 100, 1) if roe else None
+
     if market_cap:
         if market_cap >= 200e9:
             cap_size = "Mega-cap"
@@ -135,73 +160,58 @@ def fetch_stock_detail(ticker: str) -> dict:
     else:
         cap_size = "Unknown"
 
-    # Dividend: yfinance returns as decimal (0.023 = 2.3%) — convert to percent
-    div_yield_pct = round(div_yield * 100, 2) if div_yield and div_yield < 1 else (round(div_yield, 2) if div_yield else None)
-    annual_div = round(price * div_yield, 2) if price and div_yield else None
-
-    # --- Debt-to-equity: yfinance gives D/E as a raw ratio * 100 sometimes ---
-    # Normalise: if > 20, assume it's already in percent form → divide by 100
-    if debt_eq and debt_eq > 20:
-        debt_eq = round(debt_eq / 100, 2)
-
-    # --- ROE: yfinance gives decimal ---
-    roe_pct = round(roe * 100, 1) if roe else None
-
-    # --- 52W position ---
-    if price and week52_high and week52_low and (week52_high - week52_low) > 0:
-        week52_pos = round((price - week52_low) / (week52_high - week52_low) * 100, 1)
-        pct_from_low  = round((price - week52_low) / week52_low * 100, 1)
-        pct_from_high = round((price - week52_high) / week52_high * 100, 1)
-    else:
-        week52_pos = week52_pos = pct_from_low = pct_from_high = None
+    week52_pos = round((price - week52_low) / (week52_high - week52_low) * 100, 1) if week52_high != week52_low else None
 
     return {
-        # Identification
-        "ticker":      ticker.upper(),
-        "name":        info.get("longName") or info.get("shortName") or ticker,
-        "sector":      info.get("sector", "Unknown"),
-        "industry":    info.get("industry", "Unknown"),
+        "ticker": ticker,
+        "name": info.get("longName") or info.get("shortName") or ticker,
+        "sector": info.get("sector", "Unknown"),
+        "industry": info.get("industry", "Unknown"),
         "description": info.get("longBusinessSummary", ""),
-        "logo_url":    info.get("logo_url"),
-        "website":     info.get("website"),
-        "exchange":    info.get("exchange"),
-        "country":     info.get("country"),
 
-        # Price & change
-        "price":       price,
-        "price_fmt":   f"${price:,.2f}" if price else "N/A",
-        "change":      change_pct,
-        "change_abs":  change_abs,
-        "prev_close":  _safe(prev),
+        "price": price,
+        "price_fmt": f"${price:,.2f}",
+        "change": change_pct,
+        "change_abs": change_abs,
+        "prev_close": prev,
 
-        # Metrics (raw values for visualisations)
-        "pe":              pe,
-        "pe_fmt":          f"{pe:.1f}" if pe else "N/A",
-        "market_cap":      market_cap,
-        "market_cap_fmt":  _fmt_large(market_cap),
-        "cap_size":        cap_size,
-        "volume":          volume,
-        "volume_fmt":      _fmt_volume(volume),
-        "avg_volume":      avg_volume,
-        "avg_volume_fmt":  _fmt_volume(avg_volume),
-        "volume_ratio":    round(volume / avg_volume, 2) if volume and avg_volume else None,
-        "div_yield":       div_yield_pct,              # percent e.g. 0.6
-        "div_yield_fmt":   f"{div_yield_pct:.2f}%" if div_yield_pct else "0%",
-        "annual_div":      annual_div,                 # dollars per share per year
-        "eps":             _safe(eps),
-        "eps_fmt":         f"${eps:.2f}" if eps else "N/A",
-        "week52_high":     week52_high,
-        "week52_low":      week52_low,
-        "week52_fmt":      f"${week52_low:.2f} – ${week52_high:.2f}" if week52_high and week52_low else "N/A",
-        "week52_pos":      week52_pos,                 # 0-100, where price sits in range
-        "pct_from_low":    pct_from_low,
-        "pct_from_high":   pct_from_high,
-        "beta":            _safe(beta),
-        "beta_fmt":        f"{beta:.2f}" if beta else "N/A",
-        "debt_to_equity":  _safe(debt_eq),
+        "pe": pe,
+        "pe_fmt": f"{pe:.1f}" if pe else "N/A",
+
+        "market_cap": market_cap,
+        "market_cap_fmt": _fmt_large(market_cap),
+        "cap_size": cap_size,
+
+        "volume": volume,
+        "volume_fmt": _fmt_volume(volume),
+        "avg_volume": avg_volume,
+        "avg_volume_fmt": _fmt_volume(avg_volume),
+        "volume_ratio": round(volume / avg_volume, 2) if volume and avg_volume else None,
+
+        "div_yield": div_yield_pct,
+        "div_yield_fmt": f"{div_yield_pct:.2f}%" if div_yield_pct else "N/A",
+
+        "annual_div": round(price * div_yield, 2) if price and div_yield else None,
+
+        "eps": eps,
+        "eps_fmt": f"${eps:.2f}" if eps else "N/A",
+
+        "week52_high": week52_high,
+        "week52_low": week52_low,
+        "week52_fmt": f"${week52_low:.2f} – ${week52_high:.2f}",
+        "week52_pos": week52_pos,
+
+        "pct_from_low": round((price - week52_low) / week52_low * 100, 1),
+        "pct_from_high": round((price - week52_high) / week52_high * 100, 1),
+
+        "beta": beta,
+        "beta_fmt": f"{beta:.2f}" if beta else "N/A",
+
+        "debt_to_equity": debt_eq,
         "debt_to_equity_fmt": f"{debt_eq:.2f}" if debt_eq else "N/A",
-        "roe":             roe_pct,                    # percent e.g. 22.0
-        "roe_fmt":         f"{roe_pct:.1f}%" if roe_pct else "N/A",
+
+        "roe": roe_pct,
+        "roe_fmt": f"{roe_pct:.1f}%" if roe_pct else "N/A",
     }
 
 
@@ -211,13 +221,14 @@ def fetch_stock_detail(ticker: str) -> dict:
 
 # Map frontend timeframe labels to yfinance period/interval params
 CHART_PARAMS = {
-    "1D":  ("1d",  "5m"),
-    "1W":  ("5d",  "30m"),
+    "1D":  ("1d",  "15m"),
+    "1W":  ("5d",  "60m"),
     "1M":  ("1mo", "1d"),
     "3M":  ("3mo", "1d"),
     "YTD": ("ytd", "1d"),
     "1Y":  ("1y",  "1d"),
     "5Y":  ("5y",  "1wk"),
+    "ALL": ("max", "1mo"),
 }
 
 def fetch_chart(ticker: str, timeframe: str = "1M") -> dict:
@@ -239,11 +250,11 @@ def fetch_chart(ticker: str, timeframe: str = "1M") -> dict:
     if hist.empty:
         return {"error": "No chart data available", "ticker": ticker, "timeframe": timeframe}
 
-    # Format dates sensibly based on interval
-    if interval in ("5m", "30m"):
-        labels = hist.index.strftime("%H:%M").tolist()
+    # Format labels nicely
+    if timeframe in ("1D", "1W"):
+        labels = hist.index.strftime("%d %b %Y, %H:%M").tolist()
     else:
-        labels = hist.index.strftime("%Y-%m-%d").tolist()
+        labels = hist.index.strftime("%d %b %Y").tolist()
 
     closes  = [round(v, 2) for v in hist["Close"].ffill().tolist()]
     opens   = [round(v, 2) for v in hist["Open"].ffill().tolist()]
