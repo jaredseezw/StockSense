@@ -48,30 +48,3 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_ENV", "development") == "development"
     print(f"StockSense backend starting on port {port}")
     app.run(host="0.0.0.0", port=port, debug=debug)
-
-@app.route("/api/stock/<ticker>")
-def get_stock(ticker):
-    try:
-        stock = yf.Ticker(ticker)
-        history = stock.history(period="1mo")
-
-        if history.empty:
-            return jsonify({
-                "error": "No data found",
-                "ticker": ticker.upper()
-            }), 404
-
-        latest_price = round(float(history["Close"].iloc[-1]), 2)
-
-        return jsonify({
-            "ticker": ticker.upper(),
-            "latest_price": latest_price,
-            "dates": [str(date.date()) for date in history.index],
-            "prices": [round(float(price), 2) for price in history["Close"]]
-        })
-
-    except Exception as e:
-        return jsonify({
-            "error": str(e),
-            "ticker": ticker.upper()
-        }), 500
