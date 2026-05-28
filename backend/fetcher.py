@@ -121,7 +121,7 @@ def fetch_stock_detail(ticker: str) -> dict:
     threads=False
 )
     if isinstance(hist.columns, pd.MultiIndex):
-    hist.columns = hist.columns.get_level_values(0)
+        hist.columns = hist.columns.get_level_values(0)
 
     if hist.empty:
         raise ValueError(f"No stock data found for {ticker}")
@@ -264,7 +264,7 @@ def fetch_chart(ticker: str, timeframe: str = "1M") -> dict:
     )
 
     if isinstance(hist.columns, pd.MultiIndex):
-    hist.columns = hist.columns.get_level_values(0)
+        hist.columns = hist.columns.get_level_values(0)
 
     if hist.empty:
         return {"error": "No chart data available", "ticker": ticker, "timeframe": timeframe}
@@ -368,7 +368,7 @@ def fetch_volume_history(ticker: str) -> dict:
     )
 
     if isinstance(hist.columns, pd.MultiIndex):
-    hist.columns = hist.columns.get_level_values(0)
+        hist.columns = hist.columns.get_level_values(0)
 
     if hist.empty:
         return {}
