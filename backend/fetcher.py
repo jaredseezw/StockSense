@@ -611,7 +611,7 @@ def fetch_movers(n: int = 6) -> dict:
     )
 
     if isinstance(hist.columns, pd.MultiIndex):
-    hist.columns = hist.columns.get_level_values(0)
+        hist.columns = hist.columns.get_level_values(0)
 
     rows = []
     for ticker in STOCK_UNIVERSE:
