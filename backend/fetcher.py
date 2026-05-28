@@ -438,154 +438,30 @@ def fetch_indices() -> list:
 
 # The app's known stock universe — same tickers as the frontend hardcoded list
 STOCK_UNIVERSE = [
-    # ── ETFs & Index Funds ──────────────────────────────────────────────────
-    "VOO", "SPY", "QQQ", "VTI", "IWM", "ARKK", "DIA", "VUG", "SCHD", "VYM",
-    "GLD", "SLV", "TLT", "HYG", "LQD", "BND", "AGG", "EMB",
-    "XLK", "XLV", "XLF", "XLE", "XLY", "XLP", "XLI", "XLB", "XLU", "XLRE", "XLC",
-    "SQQQ", "TQQQ", "SPXU", "UPRO", "SPXL", "LABU", "SOXL", "SOXS",
-    "JEPI", "JEPQ", "QYLD", "RYLD", "XYLD",
-    "VNQ", "VNQI", "VEA", "VWO", "EEM", "EFA", "IEMG",
-    "ARKW", "ARKG", "ARKF", "ARKQ",
-    "IBIT", "FBTC", "GBTC", "BITO",
+    # ETFs
+    "VOO", "SPY", "QQQ", "VTI", "IWM",
 
-    # ── Mega-cap Technology ─────────────────────────────────────────────────
-    "AAPL", "MSFT", "NVDA", "GOOGL", "GOOG", "META", "TSLA", "AMZN", "AVGO",
-    "ORCL", "ADBE", "CRM", "NFLX", "INTC", "AMD", "QCOM", "TXN", "MU",
+    # Tech
+    "AAPL", "MSFT", "NVDA", "GOOGL", "META",
+    "TSLA", "AMD", "AMZN", "NFLX",
 
-    # ── Semiconductors ──────────────────────────────────────────────────────
-    "AMAT", "LRCX", "KLAC", "SNPS", "CDNS", "MRVL", "ON", "SWKS", "MPWR",
-    "WOLF", "SMCI", "ARM", "TSM", "ASML", "AEHR", "AMBA",
+    # Finance
+    "JPM", "BAC", "GS", "V", "MA",
 
-    # ── Software & Cloud ────────────────────────────────────────────────────
-    "PANW", "CRWD", "ZS", "OKTA", "DDOG", "SNOW", "PLTR", "UBER", "LYFT",
-    "NOW", "WDAY", "VEEV", "HUBS", "BILL", "GTLB", "MDB", "ESTC", "CFLT",
-    "PATH", "S", "SQ", "PYPL", "HOOD", "COIN", "MSTR", "APP",
-    "NET", "FSLY", "DOMO", "ZI", "TTD", "TRADE", "MGNI",
+    # Healthcare
+    "UNH", "LLY", "JNJ", "PFE",
 
-    # ── Internet & Social ───────────────────────────────────────────────────
-    "SNAP", "PINS", "RBLX", "U", "MTCH", "BMBL", "DUOL", "ABNB",
+    # Energy
+    "XOM", "CVX", "SLB",
 
-    # ── Hardware & Devices ──────────────────────────────────────────────────
-    "HPQ", "HPE", "DELL", "STX", "WDC", "PSTG", "NTAP",
+    # Consumer
+    "KO", "PEP", "COST", "WMT", "NKE",
 
-    # ── Finance — Big Banks ─────────────────────────────────────────────────
-    "JPM", "BAC", "GS", "MS", "WFC", "C", "USB", "PNC", "TFC", "KEY",
-    "RF", "CFG", "FITB", "HBAN",
+    # Industrial
+    "CAT", "GE", "BA",
 
-    # ── Finance — Payments & Fintech ────────────────────────────────────────
-    "V", "MA", "AXP", "DFS", "COF", "SYF", "ALLY",
-    "FIS", "FISV", "GPN", "WEX", "PAYO",
-
-    # ── Finance — Investment & Insurance ────────────────────────────────────
-    "BLK", "SCHW", "SPGI", "MCO", "ICE", "CME", "CBOE", "NDAQ",
-    "MET", "PRU", "AFL", "ALL", "TRV", "PGR", "HIG", "BRK-B",
-
-    # ── Healthcare — Big Pharma ─────────────────────────────────────────────
-    "JNJ", "LLY", "PFE", "ABBV", "MRK", "BMY", "AZN", "NVO", "SNY",
-    "AMGN", "GILD", "REGN", "VRTX", "BIIB", "MRNA", "BNTX",
-
-    # ── Healthcare — Devices & Services ─────────────────────────────────────
-    "UNH", "TMO", "ABT", "SYK", "ISRG", "MDT", "BSX", "EW", "DXCM",
-    "IDXX", "IQV", "CI", "CVS", "HCA", "HUM", "MOH", "CNC",
-    "HOLX", "ALGN", "INSP", "NVCR", "IONS",
-
-    # ── Biotech ─────────────────────────────────────────────────────────────
-    "ILMN", "PACB", "BEAM", "CRSP", "NTLA", "EDIT", "FATE",
-    "RXRX", "RLAY", "KYMR", "PCVX", "ROIV",
-
-    # ── Energy — Oil & Gas ──────────────────────────────────────────────────
-    "XOM", "CVX", "COP", "SLB", "EOG", "PSX", "VLO", "MPC",
-    "OXY", "HAL", "BKR", "DVN", "FANG", "HES", "MRO", "APA",
-    "SHEL", "BP", "TTE", "ENB", "ET", "WMB", "KMI",
-
-    # ── Energy — Renewables ─────────────────────────────────────────────────
-    "NEE", "ENPH", "SEDG", "RUN", "NOVA", "ARRY", "CSIQ", "FSLR",
-    "PLUG", "BE", "BLDP", "CWEN",
-
-    # ── Consumer — Food & Beverage ──────────────────────────────────────────
-    "KO", "PEP", "MDLZ", "KHC", "GIS", "CPB", "SJM", "MKC",
-    "STZ", "BUD", "TAP", "SAM",
-
-    # ── Consumer — Household & Personal Care ────────────────────────────────
-    "PG", "CL", "KMB", "CHD", "EL", "COTY", "REV", "ELF",
-
-    # ── Consumer — Tobacco ──────────────────────────────────────────────────
-    "MO", "PM", "BTI",
-
-    # ── Consumer — Apparel & Footwear ───────────────────────────────────────
-    "NKE", "LULU", "UAA", "UA", "PVH", "RL", "TPR", "CPRI",
-    "VFC", "HBI", "SKX", "DECK", "ONON", "BIRK",
-
-    # ── Consumer — Retail ───────────────────────────────────────────────────
-    "WMT", "TGT", "COST", "KR", "ACI", "SFM", "PFGC",
-    "HD", "LOW", "TSCO", "ORLY", "AZO",
-    "ROST", "TJX", "BURL", "GPS", "ANF", "AEO", "URBN",
-    "DG", "DLTR", "FIVE", "DRVN",
-
-    # ── Consumer — Restaurants & Food Service ───────────────────────────────
-    "MCD", "SBUX", "CMG", "YUM", "QSR", "DPZ", "WEN", "JACK",
-    "SHAK", "CAKE", "TXRH", "DENN",
-
-    # ── E-Commerce & Marketplaces ───────────────────────────────────────────
-    "AMZN", "BABA", "SHOP", "MELI", "EBAY", "ETSY", "JD", "PDD",
-    "W", "CHWY", "SE", "CPNG", "OZON", "GLOB",
-
-    # ── Travel & Leisure ────────────────────────────────────────────────────
-    "DAL", "UAL", "AAL", "LUV", "JBLU", "ALK", "SAVE",
-    "BKNG", "EXPE", "TRIP", "ABNB",
-    "MAR", "HLT", "H", "IHG", "WH", "ACLX",
-    "CCL", "RCL", "NCLH",
-    "WYNN", "MGM", "LVS", "CZR", "PENN", "DKNG", "RSI",
-
-    # ── Media & Entertainment ───────────────────────────────────────────────
-    "DIS", "CMCSA", "WBD", "PARA", "FOX", "FOXA",
-    "NFLX", "SPOT", "SIRI", "IHRT",
-    "EA", "TTWO", "ATVI", "RBLX", "U",
-    "NYT", "IAC",
-
-    # ── Real Estate ─────────────────────────────────────────────────────────
-    "AMT", "CCI", "SBAC", "PLD", "EQIX", "DLR",
-    "SPG", "MAC", "SKT", "KIM", "REG",
-    "O", "NNN", "STAG", "VICI", "MPW",
-    "AVB", "EQR", "UDR", "MAA", "CPT",
-    "PSA", "EXR", "CUBE", "LSI",
-    "WELL", "VTR", "PEAK", "HR",
-
-    # ── Industrials — Aerospace & Defense ───────────────────────────────────
-    "BA", "LMT", "RTX", "NOC", "GD", "HII", "L3H", "TDG", "HEI", "KTOS",
-
-    # ── Industrials — Machinery & Equipment ─────────────────────────────────
-    "CAT", "DE", "CMI", "PH", "ETN", "ROK", "EMR", "ITW",
-    "DOV", "XYL", "GNRC", "FELE",
-
-    # ── Industrials — Conglomerates ──────────────────────────────────────────
-    "GE", "HON", "MMM", "ABB",
-
-    # ── Industrials — Transport & Logistics ─────────────────────────────────
-    "UPS", "FDX", "CHRW", "XPO", "ODFL", "SAIA", "JBHT",
-    "CSX", "NSC", "UNP", "CP", "CNI",
-
-    # ── Utilities ───────────────────────────────────────────────────────────
-    "NEE", "DUK", "SO", "D", "AEP", "EXC", "SRE", "PCG",
-    "XEL", "WEC", "ES", "ETR", "FE", "PPL",
-
-    # ── Telecom ─────────────────────────────────────────────────────────────
-    "T", "VZ", "TMUS", "LUMN", "ATUS",
-
-    # ── Materials ───────────────────────────────────────────────────────────
-    "LIN", "APD", "ECL", "SHW", "PPG", "NEM", "FCX", "AA", "X", "NUE",
-    "CLF", "MP", "VALE", "RIO", "BHP",
-
-    # ── Health & Fitness ────────────────────────────────────────────────────
-    "PTON", "PLNT", "GRMN", "NVO", "ELF", "XPOF",
-
-    # ── Auto ────────────────────────────────────────────────────────────────
-    "TSLA", "F", "GM", "RIVN", "LCID", "NIO", "LI", "XPEV",
-    "TM", "HMC", "STLA", "VOW3.DE",
-
-    # ── Notable / Meme / High-Interest ──────────────────────────────────────
-    "GME", "AMC", "BB", "NOK", "BBBY", "CLOV", "WISH", "SOFI",
-    "SPCE", "OPEN", "OFFERPAD", "RKT", "UWMC",
+    # Misc
+    "UBER", "PLTR", "SNOW", "CRM"
 ]
 
 

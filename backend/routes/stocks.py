@@ -177,14 +177,14 @@ def get_stocks_list():
     cache_key     = "stocks:list:all"
 
     def _fetch_all():
-        result = []
-        for ticker in STOCK_UNIVERSE:
-            try:
-                q = fetch_quote(ticker)
-                result.append(q)
-            except Exception:
-                pass
-        return result
+    result = []
+    for ticker in STOCK_UNIVERSE:
+        try:
+            q = fetch_quote(ticker)
+            result.append(q)
+        except Exception:
+            pass
+    return result
 
     try:
         all_stocks = cache.cached(cache_key, cache.TTL_QUOTE, _fetch_all)

@@ -10,8 +10,7 @@ import {
   deleteUser,
 } from "firebase/auth";
 
-const API =
-  process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+const API = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 // Expanded sector universe - 10 well-known tickers per sector
 // Backend will fetch live prices + sort by volume ratio (trending)
