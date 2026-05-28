@@ -157,8 +157,10 @@ SECTOR_MAP = {
 
 
 def _get_index():
-    """Returns search index from cache or rebuilds it."""
-    return cache.cached("search:index", cache.TTL_SEARCH, build_search_index)
+    return [
+        {"ticker": t, "name": t, "sector": SECTOR_MAP.get(t, "Unknown")}
+        for t in STOCK_UNIVERSE
+    ]
 
 
 # ---------------------------------------------------------------------------

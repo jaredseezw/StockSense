@@ -170,6 +170,8 @@ def get_trending():
         return jsonify(data)
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+    
+@stocks_bp.route("/stocks/list")
 def get_stocks_list():
     sector_filter = request.args.get("sector", "").strip()
     cache_key     = "stocks:list:all"

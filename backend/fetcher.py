@@ -607,7 +607,6 @@ def fetch_movers(n: int = 6) -> dict:
         auto_adjust=True,
         threads=True,
         progress=False,
-        session=_get_session(),
     )
 
     if isinstance(hist.columns, pd.MultiIndex):
