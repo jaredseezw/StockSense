@@ -177,13 +177,19 @@ def get_stocks_list():
     cache_key     = "stocks:list:all"
 
     def _fetch_all():
-    result = []
+        result = []
+
     for ticker in STOCK_UNIVERSE:
         try:
             q = fetch_quote(ticker)
-            result.append(q)
-        except Exception:
-            pass
+
+            if q and isinstance(q, dict):
+                result.append(q)
+
+        except Exception as e:
+            print(f"Error fetching {ticker}: {e}")
+            continue
+
     return result
 
     try:
