@@ -27,7 +27,7 @@ app = Flask(__name__)
 # Update ALLOWED_ORIGINS in .env when you deploy.
 allowed_origins = os.getenv(
     "ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5173"
+    "http://localhost:3000,http://localhost:5173,https://supreme-system-q7jw5pj6p5r4246pv-3000.app.github.dev"
 ).split(",")
 
 CORS(app, origins=allowed_origins)
