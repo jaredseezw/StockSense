@@ -30,7 +30,7 @@ allowed_origins = os.getenv(
     "http://localhost:3000,http://localhost:5173,https://supreme-system-q7jw5pj6p5r4246pv-3000.app.github.dev"
 ).split(",")
 
-CORS(app, origins=allowed_origins)
+CORS(app, resources={r"/api/*": {"origins": "*"}})
 
 # Register route blueprints
 app.register_blueprint(stocks_bp, url_prefix="/api")
