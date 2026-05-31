@@ -2,7 +2,7 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: "AIzaSy....",
+  apiKey: "AIzaSyAOcs-zlWqoAAlgPsT0EgnyBrSoeGAv3dw",
   authDomain: "stocksenseorbital.firebaseapp.com",
   projectId: "stocksenseorbital",
   storageBucket: "stocksenseorbital.firebasestorage.app",
