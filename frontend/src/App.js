@@ -545,6 +545,7 @@ function App() {
   // ── Simulator state ─────────────────────────────────────────────────────
   const [simTicker, setSimTicker] = useState("AAPL");
   const [simSearch, setSimSearch] = useState("AAPL");
+  const [showSimDropdown, setShowSimDropdown] = useState(false);
   const [simHistory, setSimHistory] = useState(null);
   const [buyIndex, setBuyIndex] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -987,7 +988,8 @@ function App() {
     setHasInvested(false);
 
     try {
-      const response = await fetch(`${API}/simulation/history/${simTicker}`);
+      const tickerToLoad = simTicker.trim().split(" ")[0].toUpperCase();
+      const response = await fetch(`${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`);    
       const data = await response.json();
 
       if (!response.ok) {
@@ -999,6 +1001,7 @@ function App() {
       setBuyIndex(0);
       setCurrentIndex(0);
     } catch (error) {
+      console.error("Simulation fetch error:", error);
       setSimError("Could not connect to backend");
     } finally {
       setSimLoading(false);
@@ -1587,14 +1590,16 @@ function skipMonths(monthsToSkip) {
                   <input
                     className="sim-input"
                     value={simSearch}
+                    onFocus={() => setShowSimDropdown(true)}
                     onChange={(e) => {
                       setSimSearch(e.target.value);
                       setSimTicker(e.target.value.toUpperCase());
+                      setShowSimDropdown(true);
                     }}
                     placeholder="Search Apple, Tesla, VOO..."
                   />
 
-                  {simSearch.trim() && simSearchResults.length > 0 && (
+                  {showSimDropdown && simSearch.trim() && simSearchResults.length > 0 && (
                     <div className="sim-search-dropdown">
                       {simSearchResults.map((stock) => (
                         <button
@@ -1603,7 +1608,8 @@ function skipMonths(monthsToSkip) {
                           className="sim-search-option"
                           onClick={() => {
                             setSimTicker(stock.ticker);
-                            setSimSearch(`${stock.ticker} ${stock.name}`);
+                            setSimSearch(stock.ticker);
+                            setShowSimDropdown(false);
                             setSimHistory(null);
                             setHasInvested(false);
                           }}
