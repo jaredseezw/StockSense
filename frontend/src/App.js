@@ -9,8 +9,34 @@ import {
   updateProfile,
   deleteUser,
 } from "firebase/auth";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer
+} from "recharts";
 
-const API = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+//const API = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
+function getApiBaseUrl() {
+  const hostname = window.location.hostname;
+
+  if (hostname.includes(".app.github.dev")) {
+    return `https://${hostname.replace("-3000.app.github.dev", "-8000.app.github.dev")}/api`;
+  }
+
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+
+  return "http://localhost:8000/api";
+}
+
+const API = getApiBaseUrl();
+
+console.log("API URL being used:", API); //for debugging
 
 // Expanded sector universe - 10 well-known tickers per sector
 // Backend will fetch live prices + sort by volume ratio (trending)
@@ -407,6 +433,74 @@ function MetricModal({ metric, onClose }) {
     </div>
   );
 }
+function SimulatorChart({ history, buyIndex, currentIndex }) {
+  if (!history || !history.prices || history.prices.length === 0) {
+    return null;
+  }
+
+  const chartData = history.dates
+    .slice(buyIndex, currentIndex + 1)
+    .map((date, index) => {
+      const actualIndex = buyIndex + index;
+
+      return {
+        date,
+        price: history.prices[actualIndex],
+      };
+    });
+
+  if (chartData.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="sim-chart-box">
+      <ResponsiveContainer width="100%" height={320}>
+        <LineChart data={chartData}>
+          <CartesianGrid strokeDasharray="3 3" vertical={false} />
+
+          <XAxis
+            dataKey="date"
+            tickFormatter={(date) => {
+              const d = new Date(date);
+              return d.toLocaleDateString("en-US", {
+                month: "short",
+                year: "2-digit",
+              });
+            }}
+            minTickGap={40}
+          />
+
+          <YAxis
+            domain={["auto", "auto"]}
+            tickFormatter={(value) => `$${value.toFixed(0)}`}
+          />
+
+          <Tooltip
+            formatter={(value) => [`$${Number(value).toFixed(2)}`, "Price"]}
+            labelFormatter={(date) => {
+              const d = new Date(date);
+              return d.toLocaleDateString("en-US", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+            }}
+          />
+
+          <Line
+            type="monotone"
+            dataKey="price"
+            stroke="#15975b"
+            strokeWidth={3}
+            dot={false}
+            activeDot={{ r: 6 }}
+          />
+        </LineChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 function App() {
   const [page, setPage] = useState("dashboard");
@@ -448,6 +542,51 @@ function App() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveSearched, setLiveSearched] = useState(false); // has user triggered live search?
   const liveSearchTimer = useRef(null);
+  // ── Simulator state ─────────────────────────────────────────────────────
+  const [simTicker, setSimTicker] = useState("AAPL");
+  const [simSearch, setSimSearch] = useState("AAPL");
+  const [simHistory, setSimHistory] = useState(null);
+  const [buyIndex, setBuyIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [investmentAmount, setInvestmentAmount] = useState(10000);
+  const [hasInvested, setHasInvested] = useState(false);
+  const [simLoading, setSimLoading] = useState(false);
+  const [simError, setSimError] = useState("");
+
+  const buyPrice = simHistory ? simHistory.prices[buyIndex] : 0;
+  const currentPrice = simHistory ? simHistory.prices[currentIndex] : 0;
+  const currentVolume = simHistory ? simHistory.volumes[currentIndex] : 0;
+
+  const sharesBought = hasInvested && buyPrice
+    ? investmentAmount / buyPrice
+    : 0;
+
+  const portfolioValue = hasInvested
+    ? sharesBought * currentPrice
+    : 0;
+
+  const profitLoss = hasInvested
+    ? portfolioValue - investmentAmount
+    : 0;
+
+  const returnPercentage = hasInvested && investmentAmount
+    ? (profitLoss / investmentAmount) * 100
+    : 0;
+  const simSearchResults = useMemo(() => {
+    const searchText = simSearch.trim().toLowerCase();
+
+    if (!searchText) {
+      return [];
+    }
+
+    return stocks
+      .filter((stock) =>
+        stock.ticker.toLowerCase().includes(searchText) ||
+        stock.name.toLowerCase().includes(searchText) ||
+        stock.sector.toLowerCase().includes(searchText)
+      )
+      .slice(0, 6);
+  }, [simSearch]);
 
   const dailyInsights = [
     { tip: "When volume spikes 3× the usual, it almost always means big news — earnings surprises, analyst upgrades, or major announcements. A price move on high volume is far more trustworthy than one on low volume.", tag: "Volume", emoji: "📊" },
@@ -841,6 +980,53 @@ function App() {
       setConfirmDelete(false);
     }
   }
+  async function loadSimulationHistory() {
+    setSimLoading(true);
+    setSimError("");
+    setSimHistory(null);
+    setHasInvested(false);
+
+    try {
+      const response = await fetch(`${API}/simulation/history/${simTicker}`);
+      const data = await response.json();
+
+      if (!response.ok) {
+        setSimError(data.error || "Failed to load simulation data");
+        return;
+      }
+
+      setSimHistory(data);
+      setBuyIndex(0);
+      setCurrentIndex(0);
+    } catch (error) {
+      setSimError("Could not connect to backend");
+    } finally {
+      setSimLoading(false);
+    }
+}
+
+function skipMonths(monthsToSkip) {
+  if (!simHistory) return;
+
+  const currentDate = new Date(simHistory.dates[currentIndex]);
+  const targetDate = new Date(currentDate);
+  targetDate.setMonth(targetDate.getMonth() + monthsToSkip);
+
+  let nextIndex = currentIndex;
+
+  for (let i = currentIndex; i < simHistory.dates.length; i++) {
+    const date = new Date(simHistory.dates[i]);
+
+    if (date >= targetDate) {
+      nextIndex = i;
+      break;
+    }
+
+    nextIndex = i;
+  }
+
+  setCurrentIndex(nextIndex);
+}
 
   return (
     <div className="app">
@@ -1383,7 +1569,198 @@ function App() {
           </section>
         )}
 
-        {["simulator", "ai", "leaderboard"].includes(page) && (
+        {page === "simulator" && (
+          <section className="page">
+            <h1>SIMULATOR</h1>
+
+            <div className="card simulator-card">
+              <h2>Historical Investment Simulator</h2>
+              <p>
+                Pick a stock, choose a buy date, invest virtual money, then scrub forward
+                to see how the price and your portfolio would have changed.
+              </p>
+
+              <div className="sim-form">
+                <div className="sim-field sim-search-field">
+                  <label>Stock Ticker</label>
+
+                  <input
+                    className="sim-input"
+                    value={simSearch}
+                    onChange={(e) => {
+                      setSimSearch(e.target.value);
+                      setSimTicker(e.target.value.toUpperCase());
+                    }}
+                    placeholder="Search Apple, Tesla, VOO..."
+                  />
+
+                  {simSearch.trim() && simSearchResults.length > 0 && (
+                    <div className="sim-search-dropdown">
+                      {simSearchResults.map((stock) => (
+                        <button
+                          key={stock.ticker}
+                          type="button"
+                          className="sim-search-option"
+                          onClick={() => {
+                            setSimTicker(stock.ticker);
+                            setSimSearch(`${stock.ticker} ${stock.name}`);
+                            setSimHistory(null);
+                            setHasInvested(false);
+                          }}
+                        >
+                          <div className="sim-search-left">
+                            <div className="sim-search-avatar">
+                              {stock.ticker[0]}
+                            </div>
+
+                            <div className="sim-search-text">
+                              <div className="sim-search-topline">
+                                <span className="sim-search-ticker">{stock.ticker}</span>
+                                <span className="sim-search-name">{stock.name}</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="sim-search-sector">
+                            {stock.sector}
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <button className="sim-primary-btn" onClick={loadSimulationHistory}>
+                  Load 10-Year History
+                </button>
+              </div>
+
+              {simLoading && <p className="sim-muted">Loading historical stock data...</p>}
+              {simError && <p className="sim-error">{simError}</p>}
+
+              {simHistory && (
+                <>
+                  <h3>1. Choose your buy date</h3>
+
+                  <input
+                    type="range"
+                    min="0"
+                    max={simHistory.dates.length - 1}
+                    value={buyIndex}
+                    onChange={(e) => {
+                      const newIndex = Number(e.target.value);
+                      setBuyIndex(newIndex);
+                      setCurrentIndex(newIndex);
+                      setHasInvested(false);
+                    }}
+                  />
+
+                  <p>
+                    Buy Date: {simHistory.dates[buyIndex]} | Buy Price: ${buyPrice}
+                  </p>
+
+                  <h3>2. Choose investment amount</h3>
+
+                  <div className="sim-form">
+                    <div className="sim-field">
+                      <label>Investment Amount</label>
+                      <input
+                        className="sim-input"
+                        type="number"
+                        value={investmentAmount}
+                        onChange={(e) => setInvestmentAmount(Number(e.target.value))}
+                      />
+                    </div>
+
+                    <button className="sim-primary-btn" onClick={() => setHasInvested(true)}>
+                      Invest ${investmentAmount}
+                    </button>
+                  </div>
+
+                  {hasInvested && (
+                    <>
+                      <div className="card sim-chart-card">
+                        <div className="sim-chart-header">
+                          <div>
+                            <h3>Price Chart</h3>
+                            <p>
+                              {simHistory.dates[buyIndex]} to {simHistory.dates[currentIndex]}
+                            </p>
+                          </div>
+
+                          <div className="sim-current-price">
+                            <span>Current Price</span>
+                            <strong>${currentPrice}</strong>
+                          </div>
+                        </div>
+
+                        <SimulatorChart
+                          history={simHistory}
+                          buyIndex={buyIndex}
+                          currentIndex={currentIndex}
+                        />
+
+                        <div className="sim-scrubber-panel">
+                          <div className="sim-scrubber-top">
+                            <h3>Scrub forward through history</h3>
+                            <p>
+                              Current Date: {simHistory.dates[currentIndex]}
+                            </p>
+                          </div>
+
+                          <input
+                            className="sim-slider"
+                            type="range"
+                            min={buyIndex}
+                            max={simHistory.dates.length - 1}
+                            value={currentIndex}
+                            onChange={(e) => setCurrentIndex(Number(e.target.value))}
+                          />
+
+                          <div className="skip-buttons">
+                            <button onClick={() => skipMonths(1)}>+1M</button>
+                            <button onClick={() => skipMonths(4)}>+4M</button>
+                            <button onClick={() => skipMonths(6)}>+6M</button>
+                            <button onClick={() => skipMonths(12)}>+1Y</button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="metric-grid">
+                        <div className="card">
+                          <h3>Shares Bought</h3>
+                          <p>{sharesBought.toFixed(4)}</p>
+                        </div>
+
+                        <div className="card">
+                          <h3>Portfolio Value</h3>
+                          <p>${portfolioValue.toFixed(2)}</p>
+                        </div>
+
+                        <div className="card">
+                          <h3>Profit / Loss</h3>
+                          <p>${profitLoss.toFixed(2)}</p>
+                        </div>
+
+                        <div className="card">
+                          <h3>Return</h3>
+                          <p>{returnPercentage.toFixed(2)}%</p>
+                        </div>
+
+                        <div className="card">
+                          <h3>Volume</h3>
+                          <p>{currentVolume.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        )}
+
+        {["ai", "leaderboard"].includes(page) && (
           <section className="page">
             <h1>{page.toUpperCase()}</h1>
             <div className="card">
