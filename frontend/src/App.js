@@ -129,13 +129,6 @@ const stocks = [
   { name: "DexCom", ticker: "DXCM", sector: "Health & Fitness", price: 121.3, change: -1.1, popularity: 56 },
 ];
 
-const holdings = [
-  { ticker: "AAPL", name: "Apple Inc.", qty: 25, change: 1.18, price: 175.43, value: 4385.75, unrealised: 730.75, realised: 120.5 },
-  { ticker: "MSFT", name: "Microsoft Corp.", qty: 15, change: -0.92, price: 343.8, value: 5157.0, unrealised: 670.5, realised: 88.2 },
-  { ticker: "TSLA", name: "Tesla Inc.", qty: 8, change: -1.24, price: 225.92, value: 1807.36, unrealised: -43.36, realised: 210.0 },
-  { ticker: "AMZN", name: "Amazon.com", qty: 5, change: 0.45, price: 3275.1, value: 16375.5, unrealised: 875.5, realised: 0 },
-];
-
 const metricInfo = [
   {
     key: "price",
