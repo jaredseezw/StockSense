@@ -135,12 +135,25 @@ def fetch_stock_detail(ticker: str) -> dict:
     change_abs = round(price - prev, 2) if prev else None
     change_pct = round((price - prev) / prev * 100, 2) if prev else None
 
-    # Optional info. If Yahoo blocks it, don't crash.
+    # Optional info. If Yahoo blocks it, don't crash — fall back to the
+    # lighter quote endpoint (same one fetch_quote() uses) for the fields
+    # it can cover, so the page isn't all "N/A" just because .info got rate-limited.
     info = {}
     try:
         info = t.info or {}
     except Exception:
         info = {}
+
+    if not info.get("trailingPE") or not info.get("marketCap"):
+        try:
+            q = _yahoo_quote(ticker)
+            info.setdefault("trailingPE", q.get("trailingPE"))
+            info.setdefault("marketCap", q.get("marketCap"))
+            info.setdefault("trailingEps", q.get("epsTrailingTwelveMonths"))
+            info.setdefault("averageVolume", q.get("averageDailyVolume3Month"))
+            info.setdefault("longName", q.get("longName") or q.get("shortName"))
+        except Exception:
+            pass
 
     pe = _safe(info.get("trailingPE"))
     market_cap = _safe(info.get("marketCap"))
@@ -485,8 +498,8 @@ def fetch_movers(n: int = 6) -> dict:
         progress=False,
     )
 
-    if isinstance(hist.columns, pd.MultiIndex):
-        hist.columns = hist.columns.get_level_values(0)
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = data.columns.get_level_values(0)
 
     rows = []
     for ticker in STOCK_UNIVERSE:

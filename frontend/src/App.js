@@ -905,7 +905,7 @@ function App() {
   const [liveSearched, setLiveSearched] = useState(false); // has user triggered live search?
   const liveSearchTimer = useRef(null);
   // ── Simulator state ─────────────────────────────────────────────────────
-  const [simTicker, setSimTicker] = useState("");
+  const [, setSimTicker] = useState("");
   const [simSearch, setSimSearch] = useState("");
   const [showSimDropdown, setShowSimDropdown] = useState(false);
   const [simHistory, setSimHistory] = useState(null);
@@ -1461,7 +1461,7 @@ function App() {
       setConfirmDelete(false);
       setUserName("Guest");
       setPage("account");
-    } catch (err) {
+    } catch {
       setAuthError("Please log out and log back in before deleting. (Firebase requires recent login)");
       setConfirmDelete(false);
     }
