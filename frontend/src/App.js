@@ -545,6 +545,7 @@ function App() {
   // ── Simulator state ─────────────────────────────────────────────────────
   const [simTicker, setSimTicker] = useState("AAPL");
   const [simSearch, setSimSearch] = useState("AAPL");
+  const [showSimDropdown, setShowSimDropdown] = useState(false);
   const [simHistory, setSimHistory] = useState(null);
   const [buyIndex, setBuyIndex] = useState(0);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -987,7 +988,12 @@ function App() {
     setHasInvested(false);
 
     try {
-      const response = await fetch(`${API}/simulation/history/${simTicker}`);
+      const tickerToLoad = simTicker.trim().split(" ")[0].toUpperCase();
+
+      const response = await fetch(
+        `${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`
+      );
+
       const data = await response.json();
 
       if (!response.ok) {
@@ -996,10 +1002,13 @@ function App() {
       }
 
       setSimHistory(data);
+      setSimTicker(data.ticker);
+      setSimSearch(data.ticker);
       setBuyIndex(0);
       setCurrentIndex(0);
     } catch (error) {
-      setSimError("Could not connect to backend");
+      console.error("Simulation fetch error:", error);
+      setSimError(`Could not connect to backend: ${error.message}`);
     } finally {
       setSimLoading(false);
     }
@@ -1583,18 +1592,21 @@ function skipMonths(monthsToSkip) {
               <div className="sim-form">
                 <div className="sim-field sim-search-field">
                   <label>Stock Ticker</label>
-
+  
                   <input
-                    className="sim-input"
-                    value={simSearch}
-                    onChange={(e) => {
-                      setSimSearch(e.target.value);
-                      setSimTicker(e.target.value.toUpperCase());
-                    }}
-                    placeholder="Search Apple, Tesla, VOO..."
-                  />
+                  className="sim-input"
+                  value={simSearch}
+                  onFocus={() => setShowSimDropdown(true)}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    setSimSearch(value);
+                    setSimTicker(value.trim().split(" ")[0].toUpperCase());
+                    setShowSimDropdown(true);
+                  }}
+                  placeholder="Search Apple, Tesla, VOO..."
+                />
 
-                  {simSearch.trim() && simSearchResults.length > 0 && (
+                  {showSimDropdown && simSearch.trim() && simSearchResults.length > 0 && (
                     <div className="sim-search-dropdown">
                       {simSearchResults.map((stock) => (
                         <button
@@ -1603,7 +1615,8 @@ function skipMonths(monthsToSkip) {
                           className="sim-search-option"
                           onClick={() => {
                             setSimTicker(stock.ticker);
-                            setSimSearch(`${stock.ticker} ${stock.name}`);
+                            setSimSearch(stock.ticker);
+                            setShowSimDropdown(false);
                             setSimHistory(null);
                             setHasInvested(false);
                           }}
@@ -1665,11 +1678,11 @@ function skipMonths(monthsToSkip) {
                     <div className="sim-field">
                       <label>Investment Amount</label>
                       <input
-                        className="sim-input"
-                        type="number"
-                        value={investmentAmount}
-                        onChange={(e) => setInvestmentAmount(Number(e.target.value))}
-                      />
+                      className="sim-input"
+                      type="number"
+                      value={investmentAmount}
+                      onChange={(e) => setInvestmentAmount(Number(e.target.value))}
+                    />
                     </div>
 
                     <button className="sim-primary-btn" onClick={() => setHasInvested(true)}>
@@ -1739,12 +1752,16 @@ function skipMonths(monthsToSkip) {
 
                         <div className="card">
                           <h3>Profit / Loss</h3>
-                          <p>${profitLoss.toFixed(2)}</p>
+                          <p className={profitLoss >= 0 ? "sim-positive" : "sim-negative"}>
+                            {profitLoss >= 0 ? "+" : "-"}${Math.abs(profitLoss).toFixed(2)}
+                          </p>
                         </div>
 
                         <div className="card">
                           <h3>Return</h3>
-                          <p>{returnPercentage.toFixed(2)}%</p>
+                          <p className={returnPercentage >= 0 ? "sim-positive" : "sim-negative"}>
+                            {returnPercentage >= 0 ? "+" : "-"}{Math.abs(returnPercentage).toFixed(2)}%
+                          </p>
                         </div>
 
                         <div className="card">
