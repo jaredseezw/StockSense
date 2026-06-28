@@ -2423,9 +2423,9 @@ body {
 .accountEmail { text-align: center; color: #8a9e90; font-size: 0.88rem; margin-bottom: 24px; }
 .accountField { margin-bottom: 16px; }
 .accountField label { display: block; font-size: 0.8rem; font-weight: 700; color: #5a7868; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-.accountFieldRow { display: flex; gap: 8px; align-items: center; }
-.accountFieldRow input { flex: 1; min-width: 0; }
-.saveNameBtn { background: #1f7d4c; color: white; border: none; border-radius: 12px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-size: 0.85rem; white-space: nowrap; flex-shrink: 0; }
+.accountFieldRow { display: flex; gap: 8px; align-items: stretch; }
+.accountFieldRow input { flex: 1; min-width: 0; width: 0; }
+.saveNameBtn { background: #1f7d4c; color: white; border: none; border-radius: 12px; padding: 10px 20px; font-weight: 700; cursor: pointer; font-size: 0.85rem; white-space: nowrap; flex-shrink: 0; }
 .readonlyInput { background: #f5f8f5; color: #8a9e90; cursor: default; }
 .logoutBtn { width: 100%; padding: 14px; background: #edf4ee; color: #1f7d4c; border: none; border-radius: 16px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 8px; }
 .logoutBtn:hover { background: #d4ead9; }
@@ -3362,3 +3362,28 @@ body {
   .portfolioAllocationCard { width: 100%; }
   .allocPie { width: 140px; height: 140px; }
 }
+
+/* ── DASHBOARD PORTFOLIO CARDS ── */
+.dashPortfolioCard { display: flex; flex-direction: column; gap: 4px; }
+.dashPortLabel { font-size: 0.85rem; color: #6c8373; margin: 0; }
+.dashPortValue { font-size: 1.8rem; font-weight: 800; color: #173427; margin: 2px 0; }
+.dashPortRow { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+.dashPortCash { font-size: 0.8rem; color: #8a9e90; }
+.dashPortChange { font-size: 0.8rem; font-weight: 700; }
+
+.dashBiggestCard { display: flex; flex-direction: column; gap: 6px; }
+.dashBiggestLabel { font-size: 0.85rem; color: #6c8373; margin: 0; }
+.dashBiggestTop { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.dashBiggestTicker { font-size: 1.3rem; font-weight: 800; color: #173427; }
+.dashBiggestName { font-size: 0.75rem; color: #8a9e90; }
+.dashBiggestChg { font-size: 0.85rem; font-weight: 700; white-space: nowrap; }
+.dashSparkline { width: 100%; height: 40px; display: block; margin-top: 4px; }
+
+.dashMixCard {}
+.dashMixInner { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+.dashMixPie { width: 90px; height: 90px; flex-shrink: 0; }
+.dashMixLegend { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+.dashMixRow { display: flex; align-items: center; gap: 6px; font-size: 0.75rem; }
+.dashMixDot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dashMixLabel { flex: 1; color: #334d3c; font-weight: 600; }
+.dashMixPct { color: #173427; font-weight: 700; }

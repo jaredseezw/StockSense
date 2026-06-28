@@ -242,6 +242,341 @@ const metricInfo = [
   },
 ];
 
+function BasicsVisual({ type }) {
+  if (type === "stock") return (
+    <div className="basicsViz stockViz">
+      <div className="stockSliceWrap">
+        <svg viewBox="0 0 200 140" className="stockPieViz">
+          <circle cx="70" cy="70" r="58" fill="#e8f6ec" stroke="#1f7d4c" strokeWidth="2" />
+          {/* Pie slices */}
+          <path d="M70,70 L70,12 A58,58 0 0,1 128,70 Z" fill="#1f7d4c" opacity="0.85" />
+          <path d="M70,70 L128,70 A58,58 0 0,1 97,122 Z" fill="#4caf50" opacity="0.7" />
+          <path d="M70,70 L97,122 A58,58 0 0,1 12,70 Z" fill="#a8e6bc" opacity="0.8" />
+          <path d="M70,70 L12,70 A58,58 0 0,1 70,12 Z" fill="#d4f7e5" opacity="0.9" />
+          <circle cx="70" cy="70" r="26" fill="white" />
+          <text x="70" y="67" textAnchor="middle" fontSize="9" fontWeight="800" fill="#1f7d4c">YOU</text>
+          <text x="70" y="79" textAnchor="middle" fontSize="7" fill="#6c8373">own a slice</text>
+          {/* Legend */}
+          <rect x="145" y="25" width="10" height="10" rx="2" fill="#1f7d4c" />
+          <text x="159" y="34" fontSize="8" fill="#334d3c">Investors</text>
+          <rect x="145" y="42" width="10" height="10" rx="2" fill="#4caf50" />
+          <text x="159" y="51" fontSize="8" fill="#334d3c">Founders</text>
+          <rect x="145" y="59" width="10" height="10" rx="2" fill="#a8e6bc" />
+          <text x="159" y="68" fontSize="8" fill="#334d3c">Employees</text>
+          <rect x="145" y="76" width="10" height="10" rx="2" fill="#d4f7e5" />
+          <text x="159" y="85" fontSize="8" fill="#334d3c">Public</text>
+        </svg>
+      </div>
+      <div className="stockVizCaption">Each share = a tiny ownership slice of a real company</div>
+    </div>
+  );
+
+  if (type === "why") return (
+    <div className="basicsViz whyViz">
+      <div className="whyBars">
+        {[
+          { label: "Savings\naccount", val: 22, pct: "2.2%/yr", color: "#d4f7e5", text: "#1f7d4c" },
+          { label: "Bonds", val: 46, pct: "4.6%/yr", color: "#a8e6bc", text: "#1f7d4c" },
+          { label: "S&P 500\navg", val: 100, pct: "~10%/yr", color: "#1f7d4c", text: "white" },
+        ].map((b, i) => (
+          <div key={i} className="whyBarCol">
+            <div className="whyBarFill" style={{ height: `${b.val}%`, background: b.color }}>
+              <span style={{ color: b.text, fontSize: "9px", fontWeight: 800 }}>{b.pct}</span>
+            </div>
+            <div className="whyBarLabel">{b.label}</div>
+          </div>
+        ))}
+      </div>
+      <div className="whyCaption">$10,000 invested for 30 years at these rates</div>
+    </div>
+  );
+
+  if (type === "choose") return (
+    <div className="basicsViz chooseViz">
+      <div className="chooseSteps">
+        {[
+          { icon: "💡", step: "1", text: "Pick a company you use or understand" },
+          { icon: "📊", step: "2", text: "Check its revenue is growing" },
+          { icon: "⚖️", step: "3", text: "Look at P/E vs sector average" },
+          { icon: "📉", step: "4", text: "Check the 52-week price range" },
+          { icon: "✅", step: "5", text: "Start small — 1-2 shares is fine" },
+        ].map((s, i) => (
+          <div key={i} className="chooseStep">
+            <div className="chooseStepNum">{s.step}</div>
+            <div className="chooseStepText">{s.icon} {s.text}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (type === "diversify") return (
+    <div className="basicsViz diversifyViz">
+      <div className="basketRow">
+        <div className="basketWrap">
+          <div className="basketIcon">🧺</div>
+          <div className="basketChips">
+            {[
+              { t: "AAPL", c: "#e8f6ec" }, { t: "XOM", c: "#fff4d6" },
+              { t: "JPM", c: "#fde8e8" }, { t: "UNH", c: "#e8edf6" },
+              { t: "VOO", c: "#f0e8f6" }, { t: "AMZN", c: "#e8f6ec" },
+            ].map((chip, i) => (
+              <div key={i} className="basketChip" style={{ background: chip.c }}>{chip.t}</div>
+            ))}
+          </div>
+        </div>
+        <div className="diversifyArrow">vs</div>
+        <div className="basketWrap singleStock">
+          <div className="basketIcon">🥚</div>
+          <div className="singleBubble">TSLA only</div>
+          <div className="singleWarning">⚠️ All eggs in one basket</div>
+        </div>
+      </div>
+      <div className="diversifyCaption">Spreading across sectors reduces risk without sacrificing growth</div>
+    </div>
+  );
+
+  if (type === "buysell") return (
+    <div className="basicsViz buysellViz">
+      <div className="buysellTrack">
+        <div className="bsZone" style={{ background: "#d4f7e5" }}>
+          <span className="bsZoneIcon">🟢</span>
+          <span className="bsZoneLabel">Consider Buying</span>
+          <small>Price dips, strong earnings, long-term thesis intact</small>
+        </div>
+        <div className="bsDivider">⚖️</div>
+        <div className="bsZone" style={{ background: "#fde8e8" }}>
+          <span className="bsZoneIcon">🔴</span>
+          <span className="bsZoneLabel">Consider Selling</span>
+          <small>Business fundamentally changed, or you need the cash</small>
+        </div>
+      </div>
+      <div className="buysellCaption">💡 "Be fearful when others are greedy, greedy when others are fearful" — Warren Buffett</div>
+    </div>
+  );
+
+  if (type === "portfolio") return (
+    <div className="basicsViz portfolioViz">
+      <div className="pvFormula">
+        <div className="pvBox">
+          <div className="pvBoxLabel">Holdings Value</div>
+          <div className="pvBoxVal" style={{ color: "#1f7d4c" }}>$7,430</div>
+          <div className="pvBoxSub">AAPL + MSFT + VOO</div>
+        </div>
+        <div className="pvPlus">+</div>
+        <div className="pvBox">
+          <div className="pvBoxLabel">Cash Balance</div>
+          <div className="pvBoxVal" style={{ color: "#4caf50" }}>$2,570</div>
+          <div className="pvBoxSub">Ready to invest</div>
+        </div>
+        <div className="pvEquals">=</div>
+        <div className="pvBox pvTotal">
+          <div className="pvBoxLabel">Total Value</div>
+          <div className="pvBoxVal">$10,000</div>
+          <div className="pvBoxSub">Your demo portfolio</div>
+        </div>
+      </div>
+      <div className="pvPnl">
+        <span className="pvPnlLabel">Unrealised P&L: </span>
+        <span className="green">↑ $430.00 (+4.3%)</span>
+        <span className="pvPnlHint"> — would be yours if you sold today</span>
+      </div>
+    </div>
+  );
+
+  if (type === "mistakes") return (
+    <div className="basicsViz mistakesViz">
+      {[
+        { icon: "😱", label: "Panic selling on dips", fix: "Zoom out — short-term dips are normal" },
+        { icon: "🎰", label: "Betting on one stock", fix: "Diversify across sectors and asset types" },
+        { icon: "📰", label: "Trading on news headlines", fix: "News is priced in fast — focus on fundamentals" },
+        { icon: "⏱️", label: "Trying to time the market", fix: "Time IN the market beats timing the market" },
+      ].map((m, i) => (
+        <div key={i} className="mistakeRow">
+          <div className="mistakeIcon">{m.icon}</div>
+          <div className="mistakeText">
+            <div className="mistakeLabel">{m.label}</div>
+            <div className="mistakeFix">✅ {m.fix}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+
+  if (type === "longterm") return (
+    <div className="basicsViz longtermViz">
+      <div className="ltCompare">
+        <div className="ltSide">
+          <div className="ltTitle" style={{ color: "#1f7d4c" }}>📈 Long-Term Investing</div>
+          <div className="ltPoints">
+            {["Hold for years", "Ride out dips", "Compound growth", "Lower stress", "Tax efficient"].map((p, i) => (
+              <div key={i} className="ltPoint">✓ {p}</div>
+            ))}
+          </div>
+        </div>
+        <div className="ltDivider">vs</div>
+        <div className="ltSide">
+          <div className="ltTitle" style={{ color: "#e87070" }}>⚡ Trading</div>
+          <div className="ltPoints">
+            {["Buy/sell daily", "Needs full attention", "High fees + taxes", "High stress", "Most traders lose"].map((p, i) => (
+              <div key={i} className="ltPoint ltPointBad">✗ {p}</div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (type === "firststock") return (
+    <div className="basicsViz firststockViz">
+      <div className="fsRoadmap">
+        {[
+          { icon: "✅", label: "Bought your first share!", done: true },
+          { icon: "📖", label: "Learn what you own — check Key Metrics", done: false },
+          { icon: "🧺", label: "Add 2–3 more stocks to diversify", done: false },
+          { icon: "📅", label: "Check in monthly, not daily", done: false },
+          { icon: "🔄", label: "Reinvest any dividends you earn", done: false },
+          { icon: "🎯", label: "Set a 1-year goal and stick to it", done: false },
+        ].map((s, i) => (
+          <div key={i} className="fsStep">
+            <div className={`fsStepDot ${s.done ? "fsDone" : ""}`}>{s.done ? "✓" : i + 1}</div>
+            <div className={`fsStepLabel ${s.done ? "fsDoneLabel" : ""}`}>{s.icon} {s.label}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  return null;
+}
+
+const basicsData = [
+  {
+    key: "stock",
+    emoji: "🌱",
+    title: "What is a stock?",
+    tag: "Foundations",
+    short: "A tiny ownership slice of a real company.",
+    detail: "When a company like Apple wants to raise money to grow, it splits itself into millions (or billions) of tiny pieces called shares, then sells them to the public on a stock exchange. When you buy one share of Apple, you literally own a small piece of the company — you're entitled to a proportional share of profits and have a vote at shareholder meetings. If Apple does well and becomes more valuable, your slice is worth more. If it struggles, your slice is worth less. That's it — stocks are ownership.",
+    visual: "stock",
+    cta: "Head to Search to browse real companies →",
+  },
+  {
+    key: "why",
+    emoji: "💡",
+    title: "Why do people invest?",
+    tag: "Motivation",
+    short: "To grow money faster than inflation eats it.",
+    detail: "Money sitting in a bank savings account earns around 2-4% per year. Inflation runs at ~3% per year. That means your savings are barely keeping pace — in real terms, you're not growing wealth. The S&P 500 (the top 500 US companies) has returned about 10% per year on average since 1957. Over 30 years, $10,000 at 2% becomes $18,000. At 10% it becomes $174,000. That's the power of compounding — your gains earn gains, year after year. Most people invest to build retirement savings, a home deposit, or generational wealth.",
+    visual: "why",
+    cta: "Try the Simulator to see compounding in action →",
+  },
+  {
+    key: "choose",
+    emoji: "🎯",
+    title: "How do I choose my first stock?",
+    tag: "Getting started",
+    short: "Start with a company you already know and use.",
+    detail: "The best first stock is a company you already understand. If you use an iPhone every day, you understand Apple's product and business. Warren Buffett's rule: only invest in businesses you can understand. After that, check a few numbers: Is revenue growing year over year? Is the company profitable (positive EPS)? Is the P/E ratio reasonable compared to competitors? Is debt manageable? In StockSense, all of these are available on every stock's detail page. Start small — even 1 fractional share gets you learning by doing.",
+    visual: "choose",
+    cta: "Click any stock to see its metrics →",
+  },
+  {
+    key: "diversify",
+    emoji: "🧺",
+    title: "What is diversification?",
+    tag: "Risk management",
+    short: "Don't put all your eggs in one basket.",
+    detail: "Diversification means spreading your money across different companies, sectors, and even asset types — so that if one crashes, the others cushion the blow. If you put everything into Tesla and Tesla drops 40%, your whole portfolio drops 40%. But if you hold Tesla, Apple, JPMorgan, and a healthcare ETF, a Tesla crash only affects 25% of your portfolio. The easiest way to diversify instantly is to buy an index ETF like VOO (S&P 500) — one purchase gives you exposure to 500 companies at once. For a virtual portfolio, aim for 5-10 stocks across at least 3 different sectors.",
+    visual: "diversify",
+    cta: "Browse by Sector in Search to spread your picks →",
+  },
+  {
+    key: "buysell",
+    emoji: "💵",
+    title: "When should I buy or sell?",
+    tag: "Timing",
+    short: "Buy when value is clear. Sell when fundamentals change.",
+    detail: "There's no perfect timing — even professional fund managers can't consistently time the market. What matters more: WHY you're buying or selling. Good reasons to buy: the price has dipped but the business hasn't changed, you're adding to a long-term position, or you've just started and want to begin building. Good reasons to sell: the reason you bought no longer holds (e.g. the company's growth has stalled), you need the cash, or one stock has grown so large it's unbalancing your portfolio. Bad reasons: panic because the news is scary, or excitement because a stock is 'hot'. In StockSense demo mode, you can buy and sell any time — use that freedom to practice without real consequences.",
+    visual: "buysell",
+    cta: "Practice buying on any stock's detail page →",
+  },
+  {
+    key: "portfolio",
+    emoji: "📈",
+    title: "What does my portfolio value mean?",
+    tag: "Portfolio",
+    short: "The total worth of everything you own — live.",
+    detail: "Your portfolio value = the current market value of all your holdings + your remaining cash. Every time a stock's price moves, your portfolio value updates. In StockSense, your Portfolio page shows this in real time using live prices from the market. Unrealised P&L is profit or loss you'd make IF you sold right now — it's not real until you sell. Realised P&L is money you've actually locked in by selling. Your goal should be to grow total portfolio value over time, not obsess over daily ups and downs. Check your portfolio weekly or monthly, not every hour.",
+    visual: "portfolio",
+    cta: "See your live portfolio value in the Portfolio tab →",
+  },
+  {
+    key: "mistakes",
+    emoji: "⚠️",
+    title: "Common beginner mistakes",
+    tag: "Risk",
+    short: "What trips up 90% of new investors.",
+    detail: "The biggest enemy of new investors is emotion — fear and greed cause most beginner losses. Panic selling when a stock drops 10% is how people turn a temporary dip into a permanent loss. Chasing 'hot' stocks after they've already doubled usually means buying at the top. Checking your portfolio every hour creates anxiety and leads to overtrading. Over-concentrating in one exciting stock (like a meme stock) can wipe out months of gains. The solution? Write down WHY you bought each stock before you buy. Then only sell if that reason is no longer true — not because the price moved.",
+    visual: "mistakes",
+    cta: "Use the Learn → Key Metrics tab to invest with confidence →",
+  },
+  {
+    key: "longterm",
+    emoji: "🧠",
+    title: "Long-term investing vs trading",
+    tag: "Strategy",
+    short: "Two very different games — most should play one.",
+    detail: "Long-term investing (also called 'buy and hold') means buying quality companies or index funds and holding for years or decades. It's low effort, tax-efficient, and has historically worked for ordinary people building wealth. Day trading is trying to profit from short-term price swings — buying and selling within days or hours. It requires enormous time, tools, and psychological discipline. Studies show that roughly 70–80% of active day traders lose money over a 1-year period. For the vast majority of people, long-term investing in diversified funds is the winning strategy. The StockSense Simulator lets you explore both approaches without risk.",
+    visual: "longterm",
+    cta: "Try the Simulator to test long-term strategies →",
+  },
+  {
+    key: "firststock",
+    emoji: "🚀",
+    title: "What should I do after buying my first stock?",
+    tag: "Next steps",
+    short: "Stay calm, stay curious, keep learning.",
+    detail: "Buying your first stock (or making your first virtual trade in StockSense) is the best way to start learning. Once you own something, you'll naturally pay more attention to the company and the market. Now: check the Key Metrics tab to understand what you own. Add 2-3 more stocks in different sectors to begin diversifying. Set a calendar reminder to review your portfolio once a month — not every day. Read StockSense's daily insights and metric explanations. And remember: even a 10% dip in your first week is completely normal — the question is whether the business itself is still strong.",
+    visual: "firststock",
+    cta: "Go to Portfolio to track your progress →",
+  },
+];
+
+function BasicsCard({ item, onNavigate }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <div className={`basicsCard ${expanded ? "basicsCardExpanded" : ""}`} onClick={() => setExpanded(e => !e)}>
+      <div className="basicsCardHeader">
+        <div className="basicsCardLeft">
+          <span className="basicsEmoji">{item.emoji}</span>
+          <div>
+            <h3 className="basicsTitle">{item.title}</h3>
+            {!expanded && <p className="basicsShort">{item.short}</p>}
+          </div>
+        </div>
+        <div className="basicsCardRight">
+          <span className="basicsTag">{item.tag}</span>
+          <span className="basicsChevron">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="basicsExpanded" onClick={e => e.stopPropagation()}>
+          <BasicsVisual type={item.key} />
+          <div className="basicsDetail">
+            <p>{item.detail}</p>
+          </div>
+          <div className="basicsCta" onClick={() => {
+            if (item.key === "why" || item.key === "longterm" || item.key === "firststock") onNavigate("simulator");
+            else if (item.key === "portfolio") onNavigate("portfolio");
+            else onNavigate("search");
+          }}>
+            {item.cta}
+          </div>
+        </div>
+      )}
+
 function MetricVisualFull({ type }) {
   if (type === "line") return (
     <div className="vizFull lineVizFull">
@@ -1133,19 +1468,34 @@ function App() {
     setHasInvested(false);
 
     try {
-      // Resolve name → ticker if user typed a company name
-      let tickerToLoad = (tickerOverride || simSearch || simTicker).trim().toUpperCase();
-      if (!tickerOverride) {
+      let tickerToLoad = tickerOverride;
+
+      if (!tickerToLoad) {
+        // Try to resolve company name → ticker from local index
         const source = searchIndex.length > 0 ? searchIndex : stocks;
         const q = simSearch.trim().toLowerCase();
         const match = source.find(s =>
           s.ticker.toLowerCase() === q ||
           s.name.toLowerCase() === q ||
-          s.name.toLowerCase().startsWith(q)
+          s.name.toLowerCase().includes(q) ||
+          s.ticker.toLowerCase().includes(q)
         );
-        if (match) tickerToLoad = match.ticker;
-        else tickerToLoad = simSearch.trim().split(" ")[0].toUpperCase();
+        if (match) {
+          tickerToLoad = match.ticker;
+        } else {
+          // Try backend search API as fallback
+          try {
+            const searchRes = await fetch(`${API}/search?q=${encodeURIComponent(simSearch.trim())}&limit=1`);
+            const searchData = await searchRes.json();
+            const results = Array.isArray(searchData) ? searchData : (searchData.results || []);
+            tickerToLoad = results.length > 0 ? results[0].ticker : simSearch.trim().split(" ")[0].toUpperCase();
+          } catch {
+            tickerToLoad = simSearch.trim().split(" ")[0].toUpperCase();
+          }
+        }
       }
+
+      tickerToLoad = tickerToLoad.trim().toUpperCase();
 
       const response = await fetch(
         `${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`
@@ -1154,7 +1504,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setSimError(data.error || "No historical data found — check the ticker or company name.");
+        setSimError(data.error || `No historical data found for "${tickerToLoad}" — check the name or ticker and try again.`);
         return;
       }
 
@@ -1243,31 +1593,116 @@ function skipMonths(monthsToSkip) {
                 💡 Unsure what P/E Ratio means? Learn key metrics in simple English.
               </div>
               {authUser ? (() => {
-                const holdingsValue = positions.reduce((sum, p) => sum + (positionQuotes[p.ticker]?.price ?? p.avgCost) * p.shares, 0);
+                const livePos = positions.map(p => {
+                  const q = positionQuotes[p.ticker];
+                  const price = q?.price ?? p.avgCost;
+                  const value = price * p.shares;
+                  const change = q?.change ?? 0;
+                  const dayChange = value * change / 100;
+                  return { ...p, price, value, change, dayChange, name: q?.name || p.name || p.ticker };
+                });
+                const holdingsValue = livePos.reduce((sum, p) => sum + p.value, 0);
                 const totalValue = (cash || 0) + holdingsValue;
-                const biggest = [...positions].sort((a, b) => ((positionQuotes[b.ticker]?.price ?? 0) * b.shares) - ((positionQuotes[a.ticker]?.price ?? 0) * a.shares))[0];
+                const totalDayChange = livePos.reduce((sum, p) => sum + p.dayChange, 0);
+                const totalDayPct = holdingsValue > 0 ? (totalDayChange / (holdingsValue - totalDayChange)) * 100 : 0;
+                const biggest = [...livePos].sort((a, b) => b.value - a.value)[0];
+
+                // Build donut pie by stock (top 4 + Others)
+                const STOCK_COLORS = ["#1f7d4c","#4caf50","#f4a623","#3498db","#9b59b6","#e67e22","#e87070","#1abc9c"];
+                const sorted4 = [...livePos].sort((a,b) => b.value - a.value);
+                const top4 = sorted4.slice(0, 4);
+                const othersVal = sorted4.slice(4).reduce((s,p) => s + p.value, 0);
+                const pieItems = othersVal > 0 ? [...top4, { ticker: "Others", value: othersVal }] : top4;
+                const pieTotal = pieItems.reduce((s,p) => s + p.value, 0) || 1;
+                let cumAngle = -Math.PI / 2;
+                const pieSlices = pieItems.map((p, i) => {
+                  const frac = p.value / pieTotal;
+                  const start = cumAngle;
+                  cumAngle += frac * 2 * Math.PI;
+                  const end = cumAngle;
+                  const r = 52, cx = 60, cy = 60;
+                  const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+                  const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
+                  const large = frac > 0.5 ? 1 : 0;
+                  const d = pieItems.length === 1
+                    ? `M${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.01},${cy-r} Z`
+                    : `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
+                  return { ...p, frac, color: i === pieItems.length-1 && othersVal > 0 ? "#c8d8d0" : STOCK_COLORS[i], d };
+                });
+
                 return (
                   <>
-                    <div className="card focusCard clickCard" onClick={() => setPage("portfolio")}>
-                      <p>Portfolio Value</p>
-                      <h2>${totalValue.toFixed(2)}</h2>
-                      <b>Cash: ${(cash || 0).toFixed(2)}</b>
+                    <div className="card focusCard clickCard dashPortfolioCard" onClick={() => setPage("portfolio")}>
+                      <p className="dashPortLabel">Portfolio Value</p>
+                      <h2 className="dashPortValue">${totalValue.toFixed(2)}</h2>
+                      <div className="dashPortRow">
+                        <span className="dashPortCash">Cash ${(cash || 0).toFixed(2)}</span>
+                        {holdingsValue > 0 && (
+                          <span className={totalDayChange >= 0 ? "green dashPortChange" : "red dashPortChange"}>
+                            {totalDayChange >= 0 ? "▲" : "▼"} ${Math.abs(totalDayChange).toFixed(2)} ({Math.abs(totalDayPct).toFixed(2)}%) today
+                          </span>
+                        )}
+                      </div>
                     </div>
-                    <div className="card clickCard" onClick={() => setPage("portfolio")}>
-                      <h3>Biggest Holding</h3>
+
+                    <div className="card clickCard dashBiggestCard" onClick={() => biggest && goStock(biggest)}>
+                      <h3 className="dashBiggestLabel">Biggest Holding</h3>
                       {biggest ? (
                         <>
-                          <h2>{biggest.ticker}</h2>
-                          <p>{positionQuotes[biggest.ticker]?.name || biggest.name || biggest.ticker}</p>
+                          <div className="dashBiggestTop">
+                            <div>
+                              <div className="dashBiggestTicker">{biggest.ticker}</div>
+                              <div className="dashBiggestName">{biggest.name}</div>
+                            </div>
+                            <span className={biggest.change >= 0 ? "green dashBiggestChg" : "red dashBiggestChg"}>
+                              {biggest.change >= 0 ? "▲" : "▼"} {Math.abs(biggest.change).toFixed(2)}%
+                            </span>
+                          </div>
+                          <svg viewBox="0 0 120 40" className="dashSparkline">
+                            <polyline
+                              points={[10,30, 25,22, 40,26, 55,18, 70,20, 85,12, 100,8, 115,10].map((v,i)=>i%2===0?v:biggest.change>=0?v:40-v+8).join(" ")}
+                              fill="none"
+                              stroke={biggest.change >= 0 ? "#1f7d4c" : "#e87070"}
+                              strokeWidth="2"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            />
+                          </svg>
                         </>
                       ) : (
                         <p className="sim-muted">No positions yet</p>
                       )}
                     </div>
-                    <div className="card clickCard" onClick={() => setPage("portfolio")}>
-                      <h3>Holdings</h3>
-                      <p>{positions.length === 0 ? "Search for a stock to make your first trade." : `${positions.length} position${positions.length === 1 ? "" : "s"}`}</p>
-                    </div>
+
+                    {livePos.length > 0 ? (
+                      <div className="card clickCard dashMixCard" onClick={() => setPage("portfolio")}>
+                        <h3>Holdings Mix</h3>
+                        <div className="dashMixInner">
+                          <svg viewBox="0 0 120 120" className="dashMixPie">
+                            {pieSlices.map((s, i) => (
+                              <path key={i} d={s.d} fill={s.color} stroke="white" strokeWidth="1.5">
+                                <title>{s.ticker}: {(s.frac*100).toFixed(1)}%</title>
+                              </path>
+                            ))}
+                            <circle cx="60" cy="60" r="26" fill="white" />
+                          </svg>
+                          <div className="dashMixLegend">
+                            {pieSlices.map((s, i) => (
+                              <div key={i} className="dashMixRow">
+                                <span className="dashMixDot" style={{ background: s.color }} />
+                                <span className="dashMixLabel">{s.ticker}</span>
+                                <span className="dashMixPct">{(s.frac*100).toFixed(0)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="card clickCard" onClick={() => setPage("portfolio")}>
+                        <h3>Holdings</h3>
+                        <p className="sim-muted">Search for a stock to make your first trade.</p>
+                      </div>
+                    )}
                   </>
                 );
               })() : (
@@ -1738,28 +2173,27 @@ function skipMonths(monthsToSkip) {
                         </div>
 
                         {livePositions.length > 0 && (() => {
-                          const SECTOR_COLORS = ["#1f7d4c","#4caf50","#a8e6bc","#f4a623","#e87070","#6c8373","#9b59b6","#3498db","#e67e22","#1abc9c"];
-                          const sectorMap = {};
-                          livePositions.forEach(p => {
-                            const sector = positionQuotes[p.ticker]?.sector || p.sector || "Other";
-                            sectorMap[sector] = (sectorMap[sector] || 0) + p.value;
-                          });
-                          const sectors = Object.entries(sectorMap).sort((a,b) => b[1]-a[1]);
-                          const total = sectors.reduce((s,[,v]) => s+v, 0) || 1;
-                          // Build SVG pie
+                          const STOCK_COLORS = ["#1f7d4c","#4caf50","#f4a623","#3498db","#9b59b6","#e67e22","#e87070","#1abc9c"];
+                          const sorted = [...livePositions].sort((a,b) => b.value - a.value);
+                          const top4 = sorted.slice(0, 4);
+                          const othersVal = sorted.slice(4).reduce((s,p) => s + p.value, 0);
+                          const pieItems = othersVal > 0 ? [...top4, { ticker: "Others", name: "Others", value: othersVal }] : top4;
+                          const pieTotal = pieItems.reduce((s,p) => s + p.value, 0) || 1;
                           let cumAngle = -Math.PI / 2;
-                          const slices = sectors.map(([name, val], i) => {
-                            const frac = val / total;
+                          const slices = pieItems.map((p, i) => {
+                            const frac = p.value / pieTotal;
                             const start = cumAngle;
                             cumAngle += frac * 2 * Math.PI;
                             const end = cumAngle;
-                            const large = frac > 0.5 ? 1 : 0;
-                            const r = 70;
-                            const cx = 80, cy = 80;
+                            const r = 70, cx = 80, cy = 80;
                             const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
                             const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
-                            const d = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
-                            return { name, val, frac, color: SECTOR_COLORS[i % SECTOR_COLORS.length], d };
+                            const large = frac > 0.5 ? 1 : 0;
+                            const d = pieItems.length === 1
+                              ? `M${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.01},${cy-r} Z`
+                              : `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
+                            const color = (i === pieItems.length-1 && othersVal > 0) ? "#c8d8d0" : STOCK_COLORS[i];
+                            return { ticker: p.ticker, frac, color, d };
                           });
                           return (
                             <div className="card portfolioAllocationCard">
@@ -1767,7 +2201,7 @@ function skipMonths(monthsToSkip) {
                               <svg viewBox="0 0 160 160" className="allocPie">
                                 {slices.map((s, i) => (
                                   <path key={i} d={s.d} fill={s.color} stroke="white" strokeWidth="2">
-                                    <title>{s.name}: {(s.frac*100).toFixed(1)}%</title>
+                                    <title>{s.ticker}: {(s.frac*100).toFixed(1)}%</title>
                                   </path>
                                 ))}
                                 <circle cx="80" cy="80" r="36" fill="white" />
@@ -1778,7 +2212,7 @@ function skipMonths(monthsToSkip) {
                                 {slices.map((s, i) => (
                                   <div key={i} className="allocLegendRow">
                                     <span className="allocDot" style={{ background: s.color }} />
-                                    <span className="allocName">{s.name}</span>
+                                    <span className="allocName">{s.ticker}</span>
                                     <span className="allocPct">{(s.frac*100).toFixed(1)}%</span>
                                   </div>
                                 ))}
@@ -1830,9 +2264,17 @@ function skipMonths(monthsToSkip) {
             </div>
 
             {learnSection === "basics" && (
-              <div className="card">
-                <h3>Coming Soon</h3>
-                <p>This learning section will be developed in a later milestone.</p>
+              <div className="basicsGrid">
+                <div className="basicsIntro">
+                  <span className="basicsIntroIcon">🌱</span>
+                  <div>
+                    <h3>Investing basics, explained simply</h3>
+                    <p>Click any card to expand a beginner-friendly explanation with visuals. Start here if you're new to investing.</p>
+                  </div>
+                </div>
+                {basicsData.map((item) => (
+                  <BasicsCard key={item.key} item={item} onNavigate={(p) => setPage(p)} />
+                ))}
               </div>
             )}
 
