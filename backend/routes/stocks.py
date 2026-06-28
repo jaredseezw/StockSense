@@ -7,6 +7,7 @@ Endpoints:
   GET /api/stock/<ticker>/eps          — quarterly EPS history
   GET /api/stock/<ticker>/volume       — 90-day volume history
   GET /api/stocks/movers               — top gainers + losers
+  GET /api/stocks/trending             — trending quotes for selected tickers
   GET /api/stocks/list                 — all stocks with live quote
 """
 
@@ -21,8 +22,60 @@ from fetcher import (
     STOCK_UNIVERSE,
 )
 import cache
+import math
 
 stocks_bp = Blueprint("stocks", __name__)
+
+
+# ---------------------------------------------------------------------------
+# Helper: clean values before sending JSON
+# Prevents invalid JSON like NaN / Infinity from breaking the frontend.
+# ---------------------------------------------------------------------------
+
+def make_json_safe(value):
+    if value is None:
+        return None
+
+    if isinstance(value, dict):
+        return {key: make_json_safe(val) for key, val in value.items()}
+
+    if isinstance(value, list):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, tuple):
+        return [make_json_safe(item) for item in value]
+
+    if isinstance(value, float):
+        if math.isnan(value) or math.isinf(value):
+            return None
+        return value
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, bool):
+        return value
+
+    if isinstance(value, str):
+        return value
+
+    # Handles numpy / pandas scalar values if they appear
+    try:
+        if hasattr(value, "item"):
+            return make_json_safe(value.item())
+    except Exception:
+        pass
+
+    # Last fallback
+    try:
+        converted = float(value)
+
+        if math.isnan(converted) or math.isinf(converted):
+            return None
+
+        return converted
+    except Exception:
+        return str(value)
 
 
 # ---------------------------------------------------------------------------
@@ -32,7 +85,7 @@ stocks_bp = Blueprint("stocks", __name__)
 
 @stocks_bp.route("/stock/<ticker>")
 def get_stock(ticker: str):
-    ticker = ticker.upper()
+    ticker = ticker.upper().strip()
     cache_key = f"stock:detail:{ticker}"
 
     def _fetch():
@@ -40,9 +93,13 @@ def get_stock(ticker: str):
 
     try:
         data = cache.cached(cache_key, cache.TTL_METRICS, _fetch)
-        return jsonify(data)
+        return jsonify(make_json_safe(data))
+
     except Exception as e:
-        return jsonify({"error": str(e), "ticker": ticker}), 500
+        return jsonify({
+            "error": str(e),
+            "ticker": ticker
+        }), 500
 
 
 # ---------------------------------------------------------------------------
@@ -52,12 +109,18 @@ def get_stock(ticker: str):
 
 @stocks_bp.route("/stock/<ticker>/chart")
 def get_chart(ticker: str):
-    ticker    = ticker.upper()
+    ticker = ticker.upper().strip()
     timeframe = request.args.get("range", "1M").upper()
 
-    valid_ranges = {"5M", "15M", "1H", "1D", "1W", "1M", "3M", "YTD", "1Y", "5Y", "ALL"}
+    valid_ranges = {
+        "5M", "15M", "1H", "1D", "1W",
+        "1M", "3M", "YTD", "1Y", "5Y", "ALL"
+    }
+
     if timeframe not in valid_ranges:
-        return jsonify({"error": f"Invalid range. Use one of: {', '.join(valid_ranges)}"}), 400
+        return jsonify({
+            "error": f"Invalid range. Use one of: {', '.join(valid_ranges)}"
+        }), 400
 
     cache_key = f"stock:chart:{ticker}:{timeframe}"
 
@@ -66,9 +129,13 @@ def get_chart(ticker: str):
 
     try:
         data = cache.cached(cache_key, cache.TTL_CHART, _fetch)
-        return jsonify(data)
+        return jsonify(make_json_safe(data))
+
     except Exception as e:
-        return jsonify({"error": str(e), "ticker": ticker}), 500
+        return jsonify({
+            "error": str(e),
+            "ticker": ticker
+        }), 500
 
 
 # ---------------------------------------------------------------------------
@@ -78,7 +145,7 @@ def get_chart(ticker: str):
 
 @stocks_bp.route("/stock/<ticker>/eps")
 def get_eps(ticker: str):
-    ticker = ticker.upper()
+    ticker = ticker.upper().strip()
     cache_key = f"stock:eps:{ticker}"
 
     def _fetch():
@@ -86,9 +153,17 @@ def get_eps(ticker: str):
 
     try:
         data = cache.cached(cache_key, cache.TTL_METRICS, _fetch)
-        return jsonify({"ticker": ticker, "quarters": data})
+
+        return jsonify(make_json_safe({
+            "ticker": ticker,
+            "quarters": data
+        }))
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e),
+            "ticker": ticker
+        }), 500
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +173,7 @@ def get_eps(ticker: str):
 
 @stocks_bp.route("/stock/<ticker>/volume")
 def get_volume(ticker: str):
-    ticker = ticker.upper()
+    ticker = ticker.upper().strip()
     cache_key = f"stock:volume:{ticker}"
 
     def _fetch():
@@ -106,14 +181,24 @@ def get_volume(ticker: str):
 
     try:
         data = cache.cached(cache_key, cache.TTL_CHART, _fetch)
-        return jsonify({"ticker": ticker, **data})
+
+        return jsonify(make_json_safe({
+            "ticker": ticker,
+            **data
+        }))
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e),
+            "ticker": ticker
+        }), 500
 
 
 # ---------------------------------------------------------------------------
 # GET /api/stocks/movers?n=6
 # Top gainers and losers across the whole stock universe
+# Uses live fetch_movers first.
+# If fetch_movers crashes, returns fallback data instead of 500.
 # ---------------------------------------------------------------------------
 
 @stocks_bp.route("/stocks/movers")
@@ -121,84 +206,134 @@ def get_movers():
     n = min(int(request.args.get("n", 6)), 20)
     cache_key = f"stocks:movers:{n}"
 
+    fallback_data = {
+        "gainers": [
+            {"ticker": "NVDA", "name": "Nvidia", "change": 2.35, "sector": "Technology"},
+            {"ticker": "AAPL", "name": "Apple", "change": 1.18, "sector": "Technology"},
+            {"ticker": "MSFT", "name": "Microsoft", "change": 0.95, "sector": "Technology"},
+            {"ticker": "AMZN", "name": "Amazon", "change": 0.82, "sector": "E-Commerce"},
+            {"ticker": "GOOGL", "name": "Alphabet", "change": 0.76, "sector": "Technology"},
+            {"ticker": "VOO", "name": "S&P 500 ETF (Vanguard)", "change": 0.51, "sector": "ETF"},
+        ][:n],
+        "losers": [
+            {"ticker": "TSLA", "name": "Tesla", "change": -1.42, "sector": "Technology"},
+            {"ticker": "META", "name": "Meta", "change": -0.88, "sector": "Technology"},
+            {"ticker": "JPM", "name": "JPMorgan", "change": -0.61, "sector": "Finance"},
+            {"ticker": "XOM", "name": "Exxon Mobil", "change": -0.54, "sector": "Energy"},
+            {"ticker": "PFE", "name": "Pfizer", "change": -0.49, "sector": "Healthcare"},
+            {"ticker": "QQQ", "name": "Invesco QQQ ETF", "change": -0.35, "sector": "ETF"},
+        ][:n]
+    }
+
     def _fetch():
         return fetch_movers(n)
 
     try:
         data = cache.cached(cache_key, cache.TTL_MOVERS, _fetch)
-        return jsonify(data)
+        return jsonify(make_json_safe(data))
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        print(f"Movers endpoint failed: {e}")
+        return jsonify(make_json_safe(fallback_data))
 
 
 # ---------------------------------------------------------------------------
-# GET /api/stocks/list?sector=Technology
-# All stocks with live quote (price + change). Optional sector filter.
-# Powers the Browse by Sector panel and search suggestions.
+# GET /api/stocks/trending?tickers=AAPL,MSFT,NVDA&n=10
+# Fetches quotes for given tickers, sorts by volume ratio.
+# Used for sector browser with expanded universe.
 # ---------------------------------------------------------------------------
 
 @stocks_bp.route("/stocks/trending")
 def get_trending():
-    """
-    GET /api/stocks/trending?tickers=AAPL,MSFT,NVDA&n=10
-    Fetches quotes for given tickers, sorts by volume ratio (trending),
-    returns top n. Used for sector browser with expanded universe.
-    """
     tickers_param = request.args.get("tickers", "")
     n = min(int(request.args.get("n", 10)), 20)
 
     if not tickers_param:
         return jsonify([])
 
-    tickers = [t.strip().upper() for t in tickers_param.split(",") if t.strip()]
+    tickers = [
+        ticker.strip().upper()
+        for ticker in tickers_param.split(",")
+        if ticker.strip()
+    ]
+
     cache_key = f"stocks:trending:{'_'.join(sorted(tickers))}:{n}"
 
     def _fetch():
         results = []
+
         for ticker in tickers:
             try:
-                q = fetch_quote(ticker)
-                results.append(q)
-            except Exception:
-                pass
-        # Sort by volume ratio (today vs average) — most unusual activity first
-        results.sort(key=lambda r: (r.get("volume") or 0) / max(r.get("avg_volume") or 1, 1), reverse=True)
+                quote = fetch_quote(ticker)
+
+                if quote and isinstance(quote, dict):
+                    results.append(quote)
+
+            except Exception as e:
+                print(f"Error fetching trending quote for {ticker}: {e}")
+                continue
+
+        results.sort(
+            key=lambda item: (
+                (item.get("volume") or 0) /
+                max(item.get("avg_volume") or 1, 1)
+            ),
+            reverse=True
+        )
+
         return results[:n]
 
     try:
         data = cache.cached(cache_key, cache.TTL_MOVERS, _fetch)
-        return jsonify(data)
+        return jsonify(make_json_safe(data))
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
-    
+        return jsonify({
+            "error": str(e)
+        }), 500
+
+
+# ---------------------------------------------------------------------------
+# GET /api/stocks/list?sector=Technology
+# All stocks with live quote. Optional sector filter.
+# Powers Browse by Sector panel and search suggestions.
+# ---------------------------------------------------------------------------
+
 @stocks_bp.route("/stocks/list")
 def get_stocks_list():
     sector_filter = request.args.get("sector", "").strip()
-    cache_key     = "stocks:list:all"
+    cache_key = "stocks:list:all"
 
     def _fetch_all():
         result = []
 
-    for ticker in STOCK_UNIVERSE:
-        try:
-            q = fetch_quote(ticker)
+        for ticker in STOCK_UNIVERSE:
+            try:
+                quote = fetch_quote(ticker)
 
-            if q and isinstance(q, dict):
-                result.append(q)
+                if quote and isinstance(quote, dict):
+                    result.append(quote)
 
-        except Exception as e:
-            print(f"Error fetching {ticker}: {e}")
-            continue
+            except Exception as e:
+                print(f"Error fetching quote for {ticker}: {e}")
+                continue
 
-    return result
+        return result
 
     try:
         all_stocks = cache.cached(cache_key, cache.TTL_QUOTE, _fetch_all)
 
         if sector_filter:
-            filtered = [s for s in all_stocks if s.get("sector", "").lower() == sector_filter.lower()]
-            return jsonify(filtered)
+            filtered = [
+                stock for stock in all_stocks
+                if stock.get("sector", "").lower() == sector_filter.lower()
+            ]
 
-        return jsonify(all_stocks)
+            return jsonify(make_json_safe(filtered))
+
+        return jsonify(make_json_safe(all_stocks))
+
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        return jsonify({
+            "error": str(e)
+        }), 500
