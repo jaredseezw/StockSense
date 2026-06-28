@@ -1382,7 +1382,15 @@ function skipMonths(monthsToSkip) {
                     debt:     stockDetail?.debt_to_equity_fmt,
                     roe:      stockDetail?.roe_fmt,
                   };
-                  const displayValue = stockDetail ? (liveValues[m.key] ?? "N/A") : "—";
+                  const rawValue = stockDetail ? liveValues[m.key] : null;
+
+                  const displayValue =
+                    rawValue === null ||
+                    rawValue === undefined ||
+                    rawValue === "" ||
+                    String(rawValue).toLowerCase().includes("nan")
+                      ? "—"
+                      : rawValue;
                   return (
                   <div key={m.key} className="metricLine">
                     <b>
