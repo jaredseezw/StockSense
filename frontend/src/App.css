@@ -1765,23 +1765,21 @@ body {
 
 .metricBubbleTip {
   display: none;
-  position: absolute;
-  right: 26px;
-  left: auto;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 200px;
-  background: white;
-  color: #334d3c;
-  padding: 10px 12px;
+  position: fixed;
+  width: 220px;
+  background: #173427;
+  color: #e8f6ec;
+  padding: 10px 13px;
   border-radius: 12px;
   font-size: 0.8rem;
   font-style: normal;
   font-weight: 400;
-  line-height: 1.45;
-  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+  line-height: 1.5;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.25);
+  z-index: 9999;
   pointer-events: none;
+  transform: translateY(-50%);
+  margin-left: 6px;
 }
 
 .metricBubble:hover .metricBubbleTip {
@@ -2425,9 +2423,9 @@ body {
 .accountEmail { text-align: center; color: #8a9e90; font-size: 0.88rem; margin-bottom: 24px; }
 .accountField { margin-bottom: 16px; }
 .accountField label { display: block; font-size: 0.8rem; font-weight: 700; color: #5a7868; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.04em; }
-.accountFieldRow { display: flex; gap: 8px; }
-.accountFieldRow input { flex: 1; }
-.saveNameBtn { background: #1f7d4c; color: white; border: none; border-radius: 12px; padding: 0 16px; font-weight: 700; cursor: pointer; font-size: 0.85rem; }
+.accountFieldRow { display: flex; gap: 8px; align-items: center; }
+.accountFieldRow input { flex: 1; min-width: 0; }
+.saveNameBtn { background: #1f7d4c; color: white; border: none; border-radius: 12px; padding: 10px 18px; font-weight: 700; cursor: pointer; font-size: 0.85rem; white-space: nowrap; flex-shrink: 0; }
 .readonlyInput { background: #f5f8f5; color: #8a9e90; cursor: default; }
 .logoutBtn { width: 100%; padding: 14px; background: #edf4ee; color: #1f7d4c; border: none; border-radius: 16px; font-weight: 700; font-size: 1rem; cursor: pointer; margin-top: 8px; }
 .logoutBtn:hover { background: #d4ead9; }
@@ -3281,4 +3279,86 @@ body {
   .pvPlus, .pvEquals { display: none; }
   .ltCompare { flex-direction: column; }
   .buysellTrack { flex-direction: column; }
+}
+
+/* ── PORTFOLIO ALLOCATION PIE ── */
+.portfolioMainRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.portfolioPositionsCard { min-width: 0; }
+
+.portfolioAllocationCard {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+.allocPie {
+  width: 160px;
+  height: 160px;
+  display: block;
+  margin: 12px auto 14px;
+}
+
+.allocLegend {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.allocLegendRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.78rem;
+}
+
+.allocDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.allocName {
+  flex: 1;
+  color: #334d3c;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.allocPct {
+  font-weight: 700;
+  color: #173427;
+}
+
+/* ── CLICKABLE TABLE ROW ── */
+.tableClickable {
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.tableClickable:hover {
+  background: #f5fbf7;
+  border-radius: 10px;
+}
+
+/* ── TRADES TABLE HEAD ── */
+.table.head span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #8a9e90;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+@media (max-width: 860px) {
+  .portfolioMainRow { grid-template-columns: 1fr; }
+  .portfolioAllocationCard { width: 100%; }
+  .allocPie { width: 140px; height: 140px; }
 }

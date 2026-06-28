@@ -565,8 +565,8 @@ function App() {
   const [liveSearched, setLiveSearched] = useState(false); // has user triggered live search?
   const liveSearchTimer = useRef(null);
   // ── Simulator state ─────────────────────────────────────────────────────
-  const [simTicker, setSimTicker] = useState("AAPL");
-  const [simSearch, setSimSearch] = useState("AAPL");
+  const [simTicker, setSimTicker] = useState("");
+  const [simSearch, setSimSearch] = useState("");
   const [showSimDropdown, setShowSimDropdown] = useState(false);
   const [simHistory, setSimHistory] = useState(null);
   const [buyIndex, setBuyIndex] = useState(0);
@@ -1133,7 +1133,19 @@ function App() {
     setHasInvested(false);
 
     try {
-      const tickerToLoad = (tickerOverride || simTicker).trim().split(" ")[0].toUpperCase();
+      // Resolve name → ticker if user typed a company name
+      let tickerToLoad = (tickerOverride || simSearch || simTicker).trim().toUpperCase();
+      if (!tickerOverride) {
+        const source = searchIndex.length > 0 ? searchIndex : stocks;
+        const q = simSearch.trim().toLowerCase();
+        const match = source.find(s =>
+          s.ticker.toLowerCase() === q ||
+          s.name.toLowerCase() === q ||
+          s.name.toLowerCase().startsWith(q)
+        );
+        if (match) tickerToLoad = match.ticker;
+        else tickerToLoad = simSearch.trim().split(" ")[0].toUpperCase();
+      }
 
       const response = await fetch(
         `${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`
@@ -1142,7 +1154,7 @@ function App() {
       const data = await response.json();
 
       if (!response.ok) {
-        setSimError(data.error || "Failed to load simulation data");
+        setSimError(data.error || "No historical data found — check the ticker or company name.");
         return;
       }
 
@@ -1623,7 +1635,12 @@ function skipMonths(monthsToSkip) {
                   <div key={m.key} className="metricLine">
                     <b>
                       {m.name}
-                      <button className="metricBubble" onClick={(e) => { e.stopPropagation(); setOpenMetric(m); }}>?
+                      <button className="metricBubble" onClick={(e) => { e.stopPropagation(); setOpenMetric(m); }}
+                        onMouseEnter={(e) => {
+                          const r = e.currentTarget.getBoundingClientRect();
+                          const tip = e.currentTarget.querySelector('.metricBubbleTip');
+                          if (tip) { tip.style.top = r.top + r.height/2 + 'px'; tip.style.left = (r.left - 230) + 'px'; }
+                        }}>?
                         <span className="metricBubbleTip">{m.short}</span>
                       </button>
                     </b>
@@ -1682,41 +1699,93 @@ function skipMonths(monthsToSkip) {
                         <div className="card"><p>Cash Balance</p><h2>${(cash || 0).toFixed(2)}</h2></div>
                       </div>
 
-                      <div className="card">
-                        <h3>Positions</h3>
-                        {livePositions.length === 0 ? (
-                          <p className="sim-muted">No positions yet — search for a stock and buy your first share.</p>
-                        ) : (
-                          <>
-                            <div className="table head">
-                              {[
-                                ["ticker", "Stock"],
-                                ["change", "% Change"],
-                                ["price", "Current Price"],
-                                ["value", "Value"],
-                                ["unrealised", "Unrealised P&L"],
-                                ["shares", "Qty"],
-                              ].map(([key, label]) => (
-                                <button key={key} onClick={() => handleSort(key)}>
-                                  {label} {sortKey === key ? (sortDir === "desc" ? "↓" : "↑") : ""}
-                                </button>
-                              ))}
-                            </div>
-                            {sorted.map((h) => (
-                              <div className="table" key={h.ticker}>
-                                <b>
-                                  <span className="rowTicker">{h.ticker}</span>
-                                  <small className="rowName">{h.name}</small>
-                                </b>
-                                <span className={h.change >= 0 ? "green" : "red"}>{h.change >= 0 ? "↑" : "↓"} {h.change}%</span>
-                                <span>${Number(h.price).toFixed(2)}</span>
-                                <span>${h.value.toFixed(2)}</span>
-                                <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised).toFixed(2)}</span>
-                                <span>{h.shares}</span>
+                      <div className="portfolioMainRow">
+                        <div className="card portfolioPositionsCard">
+                          <h3>Positions</h3>
+                          {livePositions.length === 0 ? (
+                            <p className="sim-muted">No positions yet — search for a stock and buy your first share.</p>
+                          ) : (
+                            <>
+                              <div className="table head">
+                                {[
+                                  ["ticker", "Stock"],
+                                  ["change", "% Change"],
+                                  ["price", "Current Price"],
+                                  ["value", "Value"],
+                                  ["unrealised", "Unrealised P&L"],
+                                  ["shares", "Qty"],
+                                ].map(([key, label]) => (
+                                  <button key={key} onClick={() => handleSort(key)}>
+                                    {label} {sortKey === key ? (sortDir === "desc" ? "↓" : "↑") : ""}
+                                  </button>
+                                ))}
                               </div>
-                            ))}
-                          </>
-                        )}
+                              {sorted.map((h) => (
+                                <div className="table tableClickable" key={h.ticker} onClick={() => goStock(h)}>
+                                  <b>
+                                    <span className="rowTicker">{h.ticker}</span>
+                                    <small className="rowName">{h.name}</small>
+                                  </b>
+                                  <span className={h.change >= 0 ? "green" : "red"}>{h.change >= 0 ? "↑" : "↓"} {h.change}%</span>
+                                  <span>${Number(h.price).toFixed(2)}</span>
+                                  <span>${h.value.toFixed(2)}</span>
+                                  <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised).toFixed(2)}</span>
+                                  <span>{h.shares}</span>
+                                </div>
+                              ))}
+                            </>
+                          )}
+                        </div>
+
+                        {livePositions.length > 0 && (() => {
+                          const SECTOR_COLORS = ["#1f7d4c","#4caf50","#a8e6bc","#f4a623","#e87070","#6c8373","#9b59b6","#3498db","#e67e22","#1abc9c"];
+                          const sectorMap = {};
+                          livePositions.forEach(p => {
+                            const sector = positionQuotes[p.ticker]?.sector || p.sector || "Other";
+                            sectorMap[sector] = (sectorMap[sector] || 0) + p.value;
+                          });
+                          const sectors = Object.entries(sectorMap).sort((a,b) => b[1]-a[1]);
+                          const total = sectors.reduce((s,[,v]) => s+v, 0) || 1;
+                          // Build SVG pie
+                          let cumAngle = -Math.PI / 2;
+                          const slices = sectors.map(([name, val], i) => {
+                            const frac = val / total;
+                            const start = cumAngle;
+                            cumAngle += frac * 2 * Math.PI;
+                            const end = cumAngle;
+                            const large = frac > 0.5 ? 1 : 0;
+                            const r = 70;
+                            const cx = 80, cy = 80;
+                            const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
+                            const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
+                            const d = `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
+                            return { name, val, frac, color: SECTOR_COLORS[i % SECTOR_COLORS.length], d };
+                          });
+                          return (
+                            <div className="card portfolioAllocationCard">
+                              <h3>Allocation</h3>
+                              <svg viewBox="0 0 160 160" className="allocPie">
+                                {slices.map((s, i) => (
+                                  <path key={i} d={s.d} fill={s.color} stroke="white" strokeWidth="2">
+                                    <title>{s.name}: {(s.frac*100).toFixed(1)}%</title>
+                                  </path>
+                                ))}
+                                <circle cx="80" cy="80" r="36" fill="white" />
+                                <text x="80" y="76" textAnchor="middle" fontSize="9" fontWeight="700" fill="#173427">Holdings</text>
+                                <text x="80" y="90" textAnchor="middle" fontSize="8" fill="#6c8373">${holdingsValue.toFixed(0)}</text>
+                              </svg>
+                              <div className="allocLegend">
+                                {slices.map((s, i) => (
+                                  <div key={i} className="allocLegendRow">
+                                    <span className="allocDot" style={{ background: s.color }} />
+                                    <span className="allocName">{s.name}</span>
+                                    <span className="allocPct">{(s.frac*100).toFixed(1)}%</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
                       </div>
                     </>
                   );
@@ -1727,15 +1796,24 @@ function skipMonths(monthsToSkip) {
                   {txLog.length === 0 ? (
                     <p className="sim-muted">No trades yet.</p>
                   ) : (
-                    txLog.map((t) => (
-                      <div className="table" key={t.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
-                        <span className={t.type === "buy" ? "green" : "red"}>{t.type === "buy" ? "Bought" : "Sold"}</span>
-                        <b>{t.ticker}</b>
-                        <span>{t.shares} shares</span>
-                        <span>@ ${Number(t.price).toFixed(2)}</span>
-                        <span>${Number(t.total).toFixed(2)}</span>
+                    <>
+                      <div className="table head" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
+                        <span>Action</span>
+                        <span>Stock</span>
+                        <span>Qty</span>
+                        <span>Price</span>
+                        <span>Total</span>
                       </div>
-                    ))
+                      {txLog.map((t) => (
+                        <div className="table" key={t.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
+                          <span className={t.type === "buy" ? "green" : "red"}>{t.type === "buy" ? "Bought" : "Sold"}</span>
+                          <b>{t.ticker}</b>
+                          <span>{Number(t.shares).toFixed(4).replace(/\.?0+$/, "")} shares</span>
+                          <span>@ ${Number(t.price).toFixed(2)}</span>
+                          <span>${Number(t.total).toFixed(2)}</span>
+                        </div>
+                      ))}
+                    </>
                   )}
                 </div>
               </>
@@ -1809,16 +1887,13 @@ function skipMonths(monthsToSkip) {
                     <input value="Email / Password" readOnly className="readonlyInput"/>
                   </div>
 
-                  {authError && <p className="authError">{authError}</p>}
-
                   <button className="logoutBtn" onClick={handleLogout}>Log Out</button>
 
                   <div className="dangerZone">
-                    <p className="dangerLabel">Danger Zone</p>
                     {confirmDelete
                       ? <div className="confirmDeleteRow">
                           <span>Are you sure? This cannot be undone.</span>
-                          <button className="deleteBtn" onClick={handleDeleteAccount}>Yes, delete</button>
+                          <button className="deleteBtn" onClick={handleDeleteAccount}>Yes, delete my account</button>
                           <button className="cancelDeleteBtn" onClick={() => setConfirmDelete(false)}>Cancel</button>
                         </div>
                       : <button className="deleteBtn" onClick={handleDeleteAccount}>Delete Account</button>
@@ -1887,7 +1962,7 @@ function skipMonths(monthsToSkip) {
 
               <div className="sim-form">
                 <div className="sim-field sim-search-field">
-                  <label>Stock Ticker</label>
+                  <label>Search by company name or ticker</label>
   
                   <input
                   className="sim-input"
@@ -1905,7 +1980,7 @@ function skipMonths(monthsToSkip) {
                       loadSimulationHistory();
                     }
                   }}
-                  placeholder="Search Apple, Tesla, VOO..."
+                  placeholder="e.g. Apple, Tesla, VOO, MSFT..."
                 />
 
                   {showSimDropdown && simSearch.trim() && simSearchResults.length > 0 && (
