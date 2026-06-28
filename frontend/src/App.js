@@ -577,6 +577,11 @@ function BasicsCard({ item, onNavigate }) {
         </div>
       )}
 
+      {!expanded && <div className="basicsClickHint">Click to learn more →</div>}
+    </div>
+  );
+}
+
 function MetricVisualFull({ type }) {
   if (type === "line") return (
     <div className="vizFull lineVizFull">
