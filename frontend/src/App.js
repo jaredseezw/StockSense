@@ -553,6 +553,14 @@ function App() {
   const [hasInvested, setHasInvested] = useState(false);
   const [simLoading, setSimLoading] = useState(false);
   const [simError, setSimError] = useState("");
+  const [simAiMessages, setSimAiMessages] = useState([
+    {
+      role: "assistant",
+      text: "I can explain what happened to your historical investment once you load a stock, invest virtual money, and scrub forward."
+    }
+  ]);
+
+  const [simAiLoading, setSimAiLoading] = useState(false);
 
   const buyPrice = simHistory ? simHistory.prices[buyIndex] : 0;
   const currentPrice = simHistory ? simHistory.prices[currentIndex] : 0;
@@ -573,21 +581,32 @@ function App() {
   const returnPercentage = hasInvested && investmentAmount
     ? (profitLoss / investmentAmount) * 100
     : 0;
-  const simSearchResults = useMemo(() => {
-    const searchText = simSearch.trim().toLowerCase();
+    const cleanSimSearch = simSearch.trim().toUpperCase();
 
-    if (!searchText) {
-      return [];
-    }
+    const simSearchResults = useMemo(() => {
+      const searchText = simSearch.trim().toLowerCase();
 
-    return stocks
-      .filter((stock) =>
-        stock.ticker.toLowerCase().includes(searchText) ||
-        stock.name.toLowerCase().includes(searchText) ||
-        stock.sector.toLowerCase().includes(searchText)
-      )
-      .slice(0, 6);
-  }, [simSearch]);
+      if (!searchText) {
+        return [];
+      }
+
+      return stocks
+        .filter((stock) =>
+          stock.ticker.toLowerCase().includes(searchText) ||
+          stock.name.toLowerCase().includes(searchText) ||
+          stock.sector.toLowerCase().includes(searchText)
+        )
+        .slice(0, 6);
+    }, [simSearch]);
+
+    const hasExactSimTickerMatch = simSearchResults.some(
+      (stock) => stock.ticker.toUpperCase() === cleanSimSearch
+    );
+
+    const showRawTickerOption =
+      cleanSimSearch.length >= 1 &&
+      /^[A-Z0-9.-]+$/.test(cleanSimSearch) &&
+      !hasExactSimTickerMatch;
 
   const dailyInsights = [
     { tip: "When volume spikes 3× the usual, it almost always means big news — earnings surprises, analyst upgrades, or major announcements. A price move on high volume is far more trustworthy than one on low volume.", tag: "Volume", emoji: "📊" },
@@ -988,7 +1007,10 @@ function App() {
     setHasInvested(false);
 
     try {
-      const tickerToLoad = simTicker.trim().split(" ")[0].toUpperCase();
+      const tickerToLoad = (simTicker || simSearch)
+        .trim()
+        .split(" ")[0]
+        .toUpperCase();
 
       const response = await fetch(
         `${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`
@@ -1012,7 +1034,75 @@ function App() {
     } finally {
       setSimLoading(false);
     }
-}
+  }
+  async function askSimulatorAI() {
+    if (!simHistory || !hasInvested) {
+      setSimAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: "Load a stock, choose a buy date, enter an investment amount, and click Invest first. Then I can explain the result."
+        }
+      ]);
+      return;
+    }
+
+    const payload = {
+      ticker: simHistory.ticker,
+      buyDate: simHistory.dates[buyIndex],
+      currentDate: simHistory.dates[currentIndex],
+      buyPrice: Number(buyPrice).toFixed(2),
+      currentPrice: Number(currentPrice).toFixed(2),
+      investmentAmount: Number(investmentAmount).toFixed(2),
+      portfolioValue: Number(portfolioValue).toFixed(2),
+      profitLoss: Number(profitLoss).toFixed(2),
+      returnPercentage: Number(returnPercentage).toFixed(2),
+    };
+
+    setSimAiMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        text: `Explain my ${payload.ticker} simulation from ${payload.buyDate} to ${payload.currentDate}.`
+      }
+    ]);
+
+    setSimAiLoading(true);
+
+    try {
+      const response = await fetch(`${API}/ai/simulator-explain`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "AI explanation failed");
+      }
+
+      setSimAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: data.reply
+        }
+      ]);
+    } catch (error) {
+      setSimAiMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          text: `Sorry, I could not generate the AI explanation yet. ${error.message}`
+        }
+      ]);
+    } finally {
+      setSimAiLoading(false);
+    }
+  }
 
 function skipMonths(monthsToSkip) {
   if (!simHistory) return;
@@ -1590,7 +1680,9 @@ function skipMonths(monthsToSkip) {
           <section className="page">
             <h1>SIMULATOR</h1>
 
-            <div className="card simulator-card">
+            <div className="sim-layout">
+              <div className="sim-main-column">
+                <div className="card simulator-card">
               <h2>Historical Investment Simulator</h2>
               <p>
                 Pick a stock, choose a buy date, invest virtual money, then scrub forward
@@ -1614,7 +1706,7 @@ function skipMonths(monthsToSkip) {
                   placeholder="Search Apple, Tesla, VOO..."
                 />
 
-                  {showSimDropdown && simSearch.trim() && simSearchResults.length > 0 && (
+                  {showSimDropdown && simSearch.trim() && (
                     <div className="sim-search-dropdown">
                       {simSearchResults.map((stock) => (
                         <button
@@ -1647,6 +1739,37 @@ function skipMonths(monthsToSkip) {
                           </div>
                         </button>
                       ))}
+
+                      {showRawTickerOption && (
+                        <button
+                          type="button"
+                          className="sim-search-option"
+                          onClick={() => {
+                            setSimTicker(cleanSimSearch);
+                            setSimSearch(cleanSimSearch);
+                            setShowSimDropdown(false);
+                            setSimHistory(null);
+                            setHasInvested(false);
+                          }}
+                        >
+                          <div className="sim-search-left">
+                            <div className="sim-search-avatar">
+                              {cleanSimSearch[0]}
+                            </div>
+
+                            <div className="sim-search-text">
+                              <div className="sim-search-topline">
+                                <span className="sim-search-ticker">{cleanSimSearch}</span>
+                                <span className="sim-search-name">Use this ticker</span>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="sim-search-sector">
+                            Custom
+                          </div>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1781,8 +1904,64 @@ function skipMonths(monthsToSkip) {
                   )}
                 </>
               )}
+              </div>
             </div>
-          </section>
+
+            <aside className="sim-ai-panel sim-ai-side">
+              <div className="sim-ai-header">
+                <div>
+                  <h3>StockSense AI Coach</h3>
+                  <p>Ask AI to explain your simulator result in simple English.</p>
+                </div>
+                <span className="sim-ai-badge">AI</span>
+              </div>
+
+              <div className="sim-ai-chat">
+                {simAiMessages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={
+                      message.role === "user"
+                        ? "sim-ai-message user"
+                        : "sim-ai-message assistant"
+                    }
+                  >
+                    {message.text}
+                  </div>
+                ))}
+
+                {simAiLoading && (
+                  <div className="sim-ai-message assistant">
+                    Thinking through your simulation...
+                  </div>
+                )}
+              </div>
+
+              <button
+                className="sim-ai-button"
+                onClick={askSimulatorAI}
+                disabled={simAiLoading}
+              >
+                {simAiLoading ? "Explaining..." : "Explain this move"}
+              </button>
+
+              <button
+                className="sim-ai-secondary"
+                onClick={() =>
+                  setSimAiMessages([
+                    {
+                      role: "assistant",
+                      text: "I can explain what happened to your historical investment once you load a stock, invest virtual money, and scrub forward."
+                    }
+                  ])
+                }
+              >
+                Clear chat
+              </button>
+            </aside>
+            </div>
+            </section>
+          
         )}
 
         {["ai", "leaderboard"].includes(page) && (
