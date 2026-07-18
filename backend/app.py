@@ -19,6 +19,7 @@ from flask_cors import CORS
 
 from routes.stocks import stocks_bp
 from routes.market import market_bp
+from routes.news import news_bp
 from routes.search import search_bp
 from routes.simulation import simulation_bp
 from routes.ai import ai_bp
@@ -37,6 +38,7 @@ CORS(app, resources={r"/api/*": {"origins": "*"}})
 # Register route blueprints
 app.register_blueprint(stocks_bp, url_prefix="/api")
 app.register_blueprint(market_bp, url_prefix="/api")
+app.register_blueprint(news_bp, url_prefix="/api")
 app.register_blueprint(search_bp, url_prefix="/api")
 app.register_blueprint(simulation_bp, url_prefix="/api")
 app.register_blueprint(ai_bp, url_prefix="/api")
