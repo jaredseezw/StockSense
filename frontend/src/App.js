@@ -1379,15 +1379,7 @@ const showRawTickerOption =
 
   const sectors = ["ETFs", "Technology", "Energy", "Travel", "Healthcare", "Finance", "E-Commerce", "Consumer Goods", "Health & Fitness"];
 
-  
-
-
-
-
-
-
- 
-handleAuthSubmit(e) {
+  async function handleAuthSubmit(e) {
     e.preventDefault();
     setAuthError("");
     try {
@@ -1528,9 +1520,9 @@ handleAuthSubmit(e) {
 
           tickerToLoad = results.length > 0
             ? results[0].ticker
-            : (simTicker || simSearch).trim().split(" ")[0].toUpperCase();
+            : simSearch.trim().split(" ")[0].toUpperCase();
         } catch {
-          tickerToLoad = (simTicker || simSearch)
+          tickerToLoad = simSearch
             .trim()
             .split(" ")[0]
             .toUpperCase();
