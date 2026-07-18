@@ -1,6 +1,6 @@
 import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import "./App.css";
-import { auth, db } from "./firebase";
+import { auth } from "./firebase";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -9,48 +9,8 @@ import {
   updateProfile,
   deleteUser,
 } from "firebase/auth";
-import {
-  doc,
-  setDoc,
-  collection,
-  onSnapshot,
-  runTransaction,
-  addDoc,
-  serverTimestamp,
-  query as firestoreQuery,
-  orderBy,
-  limit,
-} from "firebase/firestore";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer
-} from "recharts";
 
-const STARTING_CASH = 10000;
-
-//const API = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
-function getApiBaseUrl() {
-  const hostname = window.location.hostname;
-
-  if (hostname.includes(".app.github.dev")) {
-    return `https://${hostname.replace("-3000.app.github.dev", "-8000.app.github.dev")}/api`;
-  }
-
-  if (process.env.REACT_APP_API_URL) {
-    return process.env.REACT_APP_API_URL;
-  }
-
-  return "http://localhost:8000/api";
-}
-
-const API = getApiBaseUrl();
-
-console.log("API URL being used:", API); //for debugging
+const API = process.env.REACT_APP_API_URL || "http://localhost:8000/api";
 
 // Expanded sector universe - 10 well-known tickers per sector
 // Backend will fetch live prices + sort by volume ratio (trending)
@@ -127,6 +87,13 @@ const stocks = [
   { name: "Planet Fitness", ticker: "PLNT", sector: "Health & Fitness", price: 68.9, change: 1.21, popularity: 52 },
   { name: "Garmin", ticker: "GRMN", sector: "Health & Fitness", price: 162.2, change: 0.77, popularity: 54 },
   { name: "DexCom", ticker: "DXCM", sector: "Health & Fitness", price: 121.3, change: -1.1, popularity: 56 },
+];
+
+const holdings = [
+  { ticker: "AAPL", name: "Apple Inc.", qty: 25, change: 1.18, price: 175.43, value: 4385.75, unrealised: 730.75, realised: 120.5 },
+  { ticker: "MSFT", name: "Microsoft Corp.", qty: 15, change: -0.92, price: 343.8, value: 5157.0, unrealised: 670.5, realised: 88.2 },
+  { ticker: "TSLA", name: "Tesla Inc.", qty: 8, change: -1.24, price: 225.92, value: 1807.36, unrealised: -43.36, realised: 210.0 },
+  { ticker: "AMZN", name: "Amazon.com", qty: 5, change: 0.45, price: 3275.1, value: 16375.5, unrealised: 875.5, realised: 0 },
 ];
 
 const metricInfo = [
@@ -241,346 +208,6 @@ const metricInfo = [
     vizPrompt: "A circular arc/donut chart where the full circle represents 30% ROE (excellent). The arc fills proportionally and is green if ROE > 15%, amber if 8-15%, red if under 8%. The exact % is shown in the centre. Below: Net Profit ÷ Equity = ROE%.",
   },
 ];
-
-function BasicsVisual({ type }) {
-  if (type === "stock") return (
-    <div className="basicsViz stockViz">
-      <div className="stockSliceWrap">
-        <svg viewBox="0 0 200 140" className="stockPieViz">
-          <circle cx="70" cy="70" r="58" fill="#e8f6ec" stroke="#1f7d4c" strokeWidth="2" />
-          {/* Pie slices */}
-          <path d="M70,70 L70,12 A58,58 0 0,1 128,70 Z" fill="#1f7d4c" opacity="0.85" />
-          <path d="M70,70 L128,70 A58,58 0 0,1 97,122 Z" fill="#4caf50" opacity="0.7" />
-          <path d="M70,70 L97,122 A58,58 0 0,1 12,70 Z" fill="#a8e6bc" opacity="0.8" />
-          <path d="M70,70 L12,70 A58,58 0 0,1 70,12 Z" fill="#d4f7e5" opacity="0.9" />
-          <circle cx="70" cy="70" r="26" fill="white" />
-          <text x="70" y="67" textAnchor="middle" fontSize="9" fontWeight="800" fill="#1f7d4c">YOU</text>
-          <text x="70" y="79" textAnchor="middle" fontSize="7" fill="#6c8373">own a slice</text>
-          {/* Legend */}
-          <rect x="145" y="25" width="10" height="10" rx="2" fill="#1f7d4c" />
-          <text x="159" y="34" fontSize="8" fill="#334d3c">Investors</text>
-          <rect x="145" y="42" width="10" height="10" rx="2" fill="#4caf50" />
-          <text x="159" y="51" fontSize="8" fill="#334d3c">Founders</text>
-          <rect x="145" y="59" width="10" height="10" rx="2" fill="#a8e6bc" />
-          <text x="159" y="68" fontSize="8" fill="#334d3c">Employees</text>
-          <rect x="145" y="76" width="10" height="10" rx="2" fill="#d4f7e5" />
-          <text x="159" y="85" fontSize="8" fill="#334d3c">Public</text>
-        </svg>
-      </div>
-      <div className="stockVizCaption">Each share = a tiny ownership slice of a real company</div>
-    </div>
-  );
-
-  if (type === "why") return (
-    <div className="basicsViz whyViz">
-      <div className="whyBars">
-        {[
-          { label: "Savings\naccount", val: 22, pct: "2.2%/yr", color: "#d4f7e5", text: "#1f7d4c" },
-          { label: "Bonds", val: 46, pct: "4.6%/yr", color: "#a8e6bc", text: "#1f7d4c" },
-          { label: "S&P 500\navg", val: 100, pct: "~10%/yr", color: "#1f7d4c", text: "white" },
-        ].map((b, i) => (
-          <div key={i} className="whyBarCol">
-            <div className="whyBarFill" style={{ height: `${b.val}%`, background: b.color }}>
-              <span style={{ color: b.text, fontSize: "9px", fontWeight: 800 }}>{b.pct}</span>
-            </div>
-            <div className="whyBarLabel">{b.label}</div>
-          </div>
-        ))}
-      </div>
-      <div className="whyCaption">$10,000 invested for 30 years at these rates</div>
-    </div>
-  );
-
-  if (type === "choose") return (
-    <div className="basicsViz chooseViz">
-      <div className="chooseSteps">
-        {[
-          { icon: "💡", step: "1", text: "Pick a company you use or understand" },
-          { icon: "📊", step: "2", text: "Check its revenue is growing" },
-          { icon: "⚖️", step: "3", text: "Look at P/E vs sector average" },
-          { icon: "📉", step: "4", text: "Check the 52-week price range" },
-          { icon: "✅", step: "5", text: "Start small — 1-2 shares is fine" },
-        ].map((s, i) => (
-          <div key={i} className="chooseStep">
-            <div className="chooseStepNum">{s.step}</div>
-            <div className="chooseStepText">{s.icon} {s.text}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  if (type === "diversify") return (
-    <div className="basicsViz diversifyViz">
-      <div className="basketRow">
-        <div className="basketWrap">
-          <div className="basketIcon">🧺</div>
-          <div className="basketChips">
-            {[
-              { t: "AAPL", c: "#e8f6ec" }, { t: "XOM", c: "#fff4d6" },
-              { t: "JPM", c: "#fde8e8" }, { t: "UNH", c: "#e8edf6" },
-              { t: "VOO", c: "#f0e8f6" }, { t: "AMZN", c: "#e8f6ec" },
-            ].map((chip, i) => (
-              <div key={i} className="basketChip" style={{ background: chip.c }}>{chip.t}</div>
-            ))}
-          </div>
-        </div>
-        <div className="diversifyArrow">vs</div>
-        <div className="basketWrap singleStock">
-          <div className="basketIcon">🥚</div>
-          <div className="singleBubble">TSLA only</div>
-          <div className="singleWarning">⚠️ All eggs in one basket</div>
-        </div>
-      </div>
-      <div className="diversifyCaption">Spreading across sectors reduces risk without sacrificing growth</div>
-    </div>
-  );
-
-  if (type === "buysell") return (
-    <div className="basicsViz buysellViz">
-      <div className="buysellTrack">
-        <div className="bsZone" style={{ background: "#d4f7e5" }}>
-          <span className="bsZoneIcon">🟢</span>
-          <span className="bsZoneLabel">Consider Buying</span>
-          <small>Price dips, strong earnings, long-term thesis intact</small>
-        </div>
-        <div className="bsDivider">⚖️</div>
-        <div className="bsZone" style={{ background: "#fde8e8" }}>
-          <span className="bsZoneIcon">🔴</span>
-          <span className="bsZoneLabel">Consider Selling</span>
-          <small>Business fundamentally changed, or you need the cash</small>
-        </div>
-      </div>
-      <div className="buysellCaption">💡 "Be fearful when others are greedy, greedy when others are fearful" — Warren Buffett</div>
-    </div>
-  );
-
-  if (type === "portfolio") return (
-    <div className="basicsViz portfolioViz">
-      <div className="pvFormula">
-        <div className="pvBox">
-          <div className="pvBoxLabel">Holdings Value</div>
-          <div className="pvBoxVal" style={{ color: "#1f7d4c" }}>$7,430</div>
-          <div className="pvBoxSub">AAPL + MSFT + VOO</div>
-        </div>
-        <div className="pvPlus">+</div>
-        <div className="pvBox">
-          <div className="pvBoxLabel">Cash Balance</div>
-          <div className="pvBoxVal" style={{ color: "#4caf50" }}>$2,570</div>
-          <div className="pvBoxSub">Ready to invest</div>
-        </div>
-        <div className="pvEquals">=</div>
-        <div className="pvBox pvTotal">
-          <div className="pvBoxLabel">Total Value</div>
-          <div className="pvBoxVal">$10,000</div>
-          <div className="pvBoxSub">Your demo portfolio</div>
-        </div>
-      </div>
-      <div className="pvPnl">
-        <span className="pvPnlLabel">Unrealised P&L: </span>
-        <span className="green">↑ $430.00 (+4.3%)</span>
-        <span className="pvPnlHint"> — would be yours if you sold today</span>
-      </div>
-    </div>
-  );
-
-  if (type === "mistakes") return (
-    <div className="basicsViz mistakesViz">
-      {[
-        { icon: "😱", label: "Panic selling on dips", fix: "Zoom out — short-term dips are normal" },
-        { icon: "🎰", label: "Betting on one stock", fix: "Diversify across sectors and asset types" },
-        { icon: "📰", label: "Trading on news headlines", fix: "News is priced in fast — focus on fundamentals" },
-        { icon: "⏱️", label: "Trying to time the market", fix: "Time IN the market beats timing the market" },
-      ].map((m, i) => (
-        <div key={i} className="mistakeRow">
-          <div className="mistakeIcon">{m.icon}</div>
-          <div className="mistakeText">
-            <div className="mistakeLabel">{m.label}</div>
-            <div className="mistakeFix">✅ {m.fix}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  );
-
-  if (type === "longterm") return (
-    <div className="basicsViz longtermViz">
-      <div className="ltCompare">
-        <div className="ltSide">
-          <div className="ltTitle" style={{ color: "#1f7d4c" }}>📈 Long-Term Investing</div>
-          <div className="ltPoints">
-            {["Hold for years", "Ride out dips", "Compound growth", "Lower stress", "Tax efficient"].map((p, i) => (
-              <div key={i} className="ltPoint">✓ {p}</div>
-            ))}
-          </div>
-        </div>
-        <div className="ltDivider">vs</div>
-        <div className="ltSide">
-          <div className="ltTitle" style={{ color: "#e87070" }}>⚡ Trading</div>
-          <div className="ltPoints">
-            {["Buy/sell daily", "Needs full attention", "High fees + taxes", "High stress", "Most traders lose"].map((p, i) => (
-              <div key={i} className="ltPoint ltPointBad">✗ {p}</div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-
-  if (type === "firststock") return (
-    <div className="basicsViz firststockViz">
-      <div className="fsRoadmap">
-        {[
-          { icon: "✅", label: "Bought your first share!", done: true },
-          { icon: "📖", label: "Learn what you own — check Key Metrics", done: false },
-          { icon: "🧺", label: "Add 2–3 more stocks to diversify", done: false },
-          { icon: "📅", label: "Check in monthly, not daily", done: false },
-          { icon: "🔄", label: "Reinvest any dividends you earn", done: false },
-          { icon: "🎯", label: "Set a 1-year goal and stick to it", done: false },
-        ].map((s, i) => (
-          <div key={i} className="fsStep">
-            <div className={`fsStepDot ${s.done ? "fsDone" : ""}`}>{s.done ? "✓" : i + 1}</div>
-            <div className={`fsStepLabel ${s.done ? "fsDoneLabel" : ""}`}>{s.icon} {s.label}</div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
-  return null;
-}
-
-const basicsData = [
-  {
-    key: "stock",
-    emoji: "🌱",
-    title: "What is a stock?",
-    tag: "Foundations",
-    short: "A tiny ownership slice of a real company.",
-    detail: "When a company like Apple wants to raise money to grow, it splits itself into millions (or billions) of tiny pieces called shares, then sells them to the public on a stock exchange. When you buy one share of Apple, you literally own a small piece of the company — you're entitled to a proportional share of profits and have a vote at shareholder meetings. If Apple does well and becomes more valuable, your slice is worth more. If it struggles, your slice is worth less. That's it — stocks are ownership.",
-    visual: "stock",
-    cta: "Head to Search to browse real companies →",
-  },
-  {
-    key: "why",
-    emoji: "💡",
-    title: "Why do people invest?",
-    tag: "Motivation",
-    short: "To grow money faster than inflation eats it.",
-    detail: "Money sitting in a bank savings account earns around 2-4% per year. Inflation runs at ~3% per year. That means your savings are barely keeping pace — in real terms, you're not growing wealth. The S&P 500 (the top 500 US companies) has returned about 10% per year on average since 1957. Over 30 years, $10,000 at 2% becomes $18,000. At 10% it becomes $174,000. That's the power of compounding — your gains earn gains, year after year. Most people invest to build retirement savings, a home deposit, or generational wealth.",
-    visual: "why",
-    cta: "Try the Simulator to see compounding in action →",
-  },
-  {
-    key: "choose",
-    emoji: "🎯",
-    title: "How do I choose my first stock?",
-    tag: "Getting started",
-    short: "Start with a company you already know and use.",
-    detail: "The best first stock is a company you already understand. If you use an iPhone every day, you understand Apple's product and business. Warren Buffett's rule: only invest in businesses you can understand. After that, check a few numbers: Is revenue growing year over year? Is the company profitable (positive EPS)? Is the P/E ratio reasonable compared to competitors? Is debt manageable? In StockSense, all of these are available on every stock's detail page. Start small — even 1 fractional share gets you learning by doing.",
-    visual: "choose",
-    cta: "Click any stock to see its metrics →",
-  },
-  {
-    key: "diversify",
-    emoji: "🧺",
-    title: "What is diversification?",
-    tag: "Risk management",
-    short: "Don't put all your eggs in one basket.",
-    detail: "Diversification means spreading your money across different companies, sectors, and even asset types — so that if one crashes, the others cushion the blow. If you put everything into Tesla and Tesla drops 40%, your whole portfolio drops 40%. But if you hold Tesla, Apple, JPMorgan, and a healthcare ETF, a Tesla crash only affects 25% of your portfolio. The easiest way to diversify instantly is to buy an index ETF like VOO (S&P 500) — one purchase gives you exposure to 500 companies at once. For a virtual portfolio, aim for 5-10 stocks across at least 3 different sectors.",
-    visual: "diversify",
-    cta: "Browse by Sector in Search to spread your picks →",
-  },
-  {
-    key: "buysell",
-    emoji: "💵",
-    title: "When should I buy or sell?",
-    tag: "Timing",
-    short: "Buy when value is clear. Sell when fundamentals change.",
-    detail: "There's no perfect timing — even professional fund managers can't consistently time the market. What matters more: WHY you're buying or selling. Good reasons to buy: the price has dipped but the business hasn't changed, you're adding to a long-term position, or you've just started and want to begin building. Good reasons to sell: the reason you bought no longer holds (e.g. the company's growth has stalled), you need the cash, or one stock has grown so large it's unbalancing your portfolio. Bad reasons: panic because the news is scary, or excitement because a stock is 'hot'. In StockSense demo mode, you can buy and sell any time — use that freedom to practice without real consequences.",
-    visual: "buysell",
-    cta: "Practice buying on any stock's detail page →",
-  },
-  {
-    key: "portfolio",
-    emoji: "📈",
-    title: "What does my portfolio value mean?",
-    tag: "Portfolio",
-    short: "The total worth of everything you own — live.",
-    detail: "Your portfolio value = the current market value of all your holdings + your remaining cash. Every time a stock's price moves, your portfolio value updates. In StockSense, your Portfolio page shows this in real time using live prices from the market. Unrealised P&L is profit or loss you'd make IF you sold right now — it's not real until you sell. Realised P&L is money you've actually locked in by selling. Your goal should be to grow total portfolio value over time, not obsess over daily ups and downs. Check your portfolio weekly or monthly, not every hour.",
-    visual: "portfolio",
-    cta: "See your live portfolio value in the Portfolio tab →",
-  },
-  {
-    key: "mistakes",
-    emoji: "⚠️",
-    title: "Common beginner mistakes",
-    tag: "Risk",
-    short: "What trips up 90% of new investors.",
-    detail: "The biggest enemy of new investors is emotion — fear and greed cause most beginner losses. Panic selling when a stock drops 10% is how people turn a temporary dip into a permanent loss. Chasing 'hot' stocks after they've already doubled usually means buying at the top. Checking your portfolio every hour creates anxiety and leads to overtrading. Over-concentrating in one exciting stock (like a meme stock) can wipe out months of gains. The solution? Write down WHY you bought each stock before you buy. Then only sell if that reason is no longer true — not because the price moved.",
-    visual: "mistakes",
-    cta: "Use the Learn → Key Metrics tab to invest with confidence →",
-  },
-  {
-    key: "longterm",
-    emoji: "🧠",
-    title: "Long-term investing vs trading",
-    tag: "Strategy",
-    short: "Two very different games — most should play one.",
-    detail: "Long-term investing (also called 'buy and hold') means buying quality companies or index funds and holding for years or decades. It's low effort, tax-efficient, and has historically worked for ordinary people building wealth. Day trading is trying to profit from short-term price swings — buying and selling within days or hours. It requires enormous time, tools, and psychological discipline. Studies show that roughly 70–80% of active day traders lose money over a 1-year period. For the vast majority of people, long-term investing in diversified funds is the winning strategy. The StockSense Simulator lets you explore both approaches without risk.",
-    visual: "longterm",
-    cta: "Try the Simulator to test long-term strategies →",
-  },
-  {
-    key: "firststock",
-    emoji: "🚀",
-    title: "What should I do after buying my first stock?",
-    tag: "Next steps",
-    short: "Stay calm, stay curious, keep learning.",
-    detail: "Buying your first stock (or making your first virtual trade in StockSense) is the best way to start learning. Once you own something, you'll naturally pay more attention to the company and the market. Now: check the Key Metrics tab to understand what you own. Add 2-3 more stocks in different sectors to begin diversifying. Set a calendar reminder to review your portfolio once a month — not every day. Read StockSense's daily insights and metric explanations. And remember: even a 10% dip in your first week is completely normal — the question is whether the business itself is still strong.",
-    visual: "firststock",
-    cta: "Go to Portfolio to track your progress →",
-  },
-];
-
-function BasicsCard({ item, onNavigate }) {
-  const [expanded, setExpanded] = useState(false);
-  return (
-    <div className={`basicsCard ${expanded ? "basicsCardExpanded" : ""}`} onClick={() => setExpanded(e => !e)}>
-      <div className="basicsCardHeader">
-        <div className="basicsCardLeft">
-          <span className="basicsEmoji">{item.emoji}</span>
-          <div>
-            <h3 className="basicsTitle">{item.title}</h3>
-            {!expanded && <p className="basicsShort">{item.short}</p>}
-          </div>
-        </div>
-        <div className="basicsCardRight">
-          <span className="basicsTag">{item.tag}</span>
-          <span className="basicsChevron">{expanded ? "▲" : "▼"}</span>
-        </div>
-      </div>
-
-      {expanded && (
-        <div className="basicsExpanded" onClick={e => e.stopPropagation()}>
-          <BasicsVisual type={item.key} />
-          <div className="basicsDetail">
-            <p>{item.detail}</p>
-          </div>
-          <div className="basicsCta" onClick={() => {
-            if (item.key === "why" || item.key === "longterm" || item.key === "firststock") onNavigate("simulator");
-            else if (item.key === "portfolio") onNavigate("portfolio");
-            else onNavigate("search");
-          }}>
-            {item.cta}
-          </div>
-        </div>
-      )}
-
-      {!expanded && <div className="basicsClickHint">Click to learn more →</div>}
-    </div>
-  );
-}
 
 function MetricVisualFull({ type }) {
   if (type === "line") return (
@@ -780,79 +407,6 @@ function MetricModal({ metric, onClose }) {
     </div>
   );
 }
-function SimulatorChart({ history, buyIndex, currentIndex }) {
-  if (!history || !history.prices || history.prices.length === 0) {
-    return null;
-  }
-
-  const chartData = history.dates
-    .slice(buyIndex, currentIndex + 1)
-    .map((date, index) => {
-      const actualIndex = buyIndex + index;
-
-      return {
-        date,
-        price: history.prices[actualIndex],
-      };
-    });
-
-  if (chartData.length === 0) {
-    return null;
-  }
-
-  const buyPrice = history.prices[buyIndex];
-  const latestPrice = history.prices[currentIndex];
-  const isLoss = buyPrice != null && latestPrice != null && latestPrice < buyPrice;
-  const lineColor = isLoss ? "#d64545" : "#15975b";
-
-  return (
-    <div className="sim-chart-box">
-      <ResponsiveContainer width="100%" height={320}>
-        <LineChart data={chartData}>
-          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-
-          <XAxis
-            dataKey="date"
-            tickFormatter={(date) => {
-              const d = new Date(date);
-              return d.toLocaleDateString("en-US", {
-                month: "short",
-                year: "2-digit",
-              });
-            }}
-            minTickGap={40}
-          />
-
-          <YAxis
-            domain={["auto", "auto"]}
-            tickFormatter={(value) => `$${value.toFixed(0)}`}
-          />
-
-          <Tooltip
-            formatter={(value) => [`$${Number(value).toFixed(2)}`, "Price"]}
-            labelFormatter={(date) => {
-              const d = new Date(date);
-              return d.toLocaleDateString("en-US", {
-                day: "numeric",
-                month: "short",
-                year: "numeric",
-              });
-            }}
-          />
-
-          <Line
-            type="monotone"
-            dataKey="price"
-            stroke={lineColor}
-            strokeWidth={3}
-            dot={false}
-            activeDot={{ r: 6 }}
-          />
-        </LineChart>
-      </ResponsiveContainer>
-    </div>
-  );
-}
 
 function App() {
   const [page, setPage] = useState("dashboard");
@@ -875,16 +429,6 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
-  // ── Portfolio / Firestore state ─────────────────────────────────────────
-  const [cash, setCash] = useState(null);            // null = not loaded yet
-  const [positions, setPositions] = useState([]);     // [{ticker, shares, avgCost}]
-  const [positionQuotes, setPositionQuotes] = useState({}); // ticker -> live quote
-  const [txLog, setTxLog] = useState([]);
-  const [tradeShares, setTradeShares] = useState("");
-  const [tradeError, setTradeError] = useState("");
-  const [tradeBusy, setTradeBusy] = useState(false);
-  const [tradeMsg, setTradeMsg] = useState("");
-
   // ── Chart state ─────────────────────────────────────────────────────────
   const [chartData, setChartData] = useState(null);
   const [chartLoading, setChartLoading] = useState(false);
@@ -904,73 +448,6 @@ function App() {
   const [liveLoading, setLiveLoading] = useState(false);
   const [liveSearched, setLiveSearched] = useState(false); // has user triggered live search?
   const liveSearchTimer = useRef(null);
-  // ── Simulator state ─────────────────────────────────────────────────────
-  const [, setSimTicker] = useState("");
-  const [simSearch, setSimSearch] = useState("");
-  const [showSimDropdown, setShowSimDropdown] = useState(false);
-  const [simHistory, setSimHistory] = useState(null);
-  const [buyIndex, setBuyIndex] = useState(0);
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const [investmentAmount, setInvestmentAmount] = useState(10000);
-  const [hasInvested, setHasInvested] = useState(false);
-  const [simLoading, setSimLoading] = useState(false);
-  const [simError, setSimError] = useState("");
-  const [simAiMessages, setSimAiMessages] = useState([
-    {
-      role: "assistant",
-      text: "I can explain what happened to your historical investment once you load a stock, invest virtual money, and scrub forward."
-    }
-  ]);
-
-  const [simAiLoading, setSimAiLoading] = useState(false);
-
-  const buyPrice = simHistory ? simHistory.prices[buyIndex] : 0;
-  const currentPrice = simHistory ? simHistory.prices[currentIndex] : 0;
-  const currentVolume = simHistory ? simHistory.volumes[currentIndex] : 0;
-
-  const sharesBought = hasInvested && buyPrice
-    ? investmentAmount / buyPrice
-    : 0;
-
-  const portfolioValue = hasInvested
-    ? sharesBought * currentPrice
-    : 0;
-
-  const profitLoss = hasInvested
-    ? portfolioValue - investmentAmount
-    : 0;
-
-  const returnPercentage = hasInvested && investmentAmount
-    ? (profitLoss / investmentAmount) * 100
-    : 0;
-    const cleanSimSearch = simSearch.trim().toUpperCase();
-
-    const simSearchResults = useMemo(() => {
-      const searchText = simSearch.trim().toLowerCase();
-
-      if (!searchText) {
-        return [];
-      }
-
-const source = searchIndex.length > 0 ? searchIndex : stocks;
-
-return source
-  .filter((stock) =>
-    stock.ticker.toLowerCase().includes(searchText) ||
-    stock.name.toLowerCase().includes(searchText) ||
-    (stock.sector || "").toLowerCase().includes(searchText)
-  )
-  .slice(0, 6);
-}, [simSearch, searchIndex]);
-
-const hasExactSimTickerMatch = simSearchResults.some(
-  (stock) => stock.ticker.toUpperCase() === cleanSimSearch
-);
-
-const showRawTickerOption =
-  cleanSimSearch.length >= 1 &&
-  /^[A-Z0-9.-]+$/.test(cleanSimSearch) &&
-  !hasExactSimTickerMatch;
 
   const dailyInsights = [
     { tip: "When volume spikes 3× the usual, it almost always means big news — earnings surprises, analyst upgrades, or major announcements. A price move on high volume is far more trustworthy than one on low volume.", tag: "Volume", emoji: "📊" },
@@ -1168,7 +645,6 @@ const showRawTickerOption =
     if (!chartData || !canvasRef.current || chartData.error) return;
     drawChart(canvasRef.current, chartData);
     setHoverInfo(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chartData]);
 
   const handleChartMouseMove = useCallback((e) => {
@@ -1193,65 +669,10 @@ const showRawTickerOption =
       setAuthUser(user);
       if (user) {
         setUserName(user.displayName || user.email.split("@")[0]);
-      } else {
-        setCash(null);
-        setPositions([]);
-        setTxLog([]);
       }
     });
     return () => unsubscribe();
   }, []);
-
-  // Live subscription to the user's cash balance + positions + recent trades.
-  // Firestore pushes updates automatically, so buying/selling on any tab/device
-  // keeps everything in sync without manual refetching.
-  useEffect(() => {
-    if (!authUser) return;
-
-    const userRef = doc(db, "users", authUser.uid);
-    const unsubUser = onSnapshot(userRef, (snap) => {
-      if (snap.exists()) {
-        setCash(snap.data().cash ?? 0);
-      }
-    });
-
-    const positionsRef = collection(db, "users", authUser.uid, "positions");
-    const unsubPositions = onSnapshot(positionsRef, (snap) => {
-      setPositions(snap.docs.map((d) => ({ ticker: d.id, ...d.data() })));
-    });
-
-    const txRef = firestoreQuery(
-      collection(db, "users", authUser.uid, "transactions"),
-      orderBy("timestamp", "desc"),
-      limit(25)
-    );
-    const unsubTx = onSnapshot(txRef, (snap) => {
-      setTxLog(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
-
-    return () => {
-      unsubUser();
-      unsubPositions();
-      unsubTx();
-    };
-  }, [authUser]);
-
-  // Live quotes for everything currently held — powers the Positions table.
-  useEffect(() => {
-    if (positions.length === 0) {
-      setPositionQuotes({});
-      return;
-    }
-    const tickers = positions.map((p) => p.ticker).join(",");
-    fetch(`${API}/stocks/trending?tickers=${encodeURIComponent(tickers)}&n=${positions.length}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const map = {};
-        (Array.isArray(data) ? data : []).forEach((q) => { map[q.ticker] = q; });
-        setPositionQuotes(map);
-      })
-      .catch(() => {});
-  }, [positions]);
 
   const hour = new Date().getHours();
   const greeting = hour < 5 ? "Good night" : hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening";
@@ -1317,6 +738,13 @@ const showRawTickerOption =
   const topGainers = movers.gainers || [];
   const topLosers = movers.losers || [];
 
+  const sortedHoldings = [...holdings].sort((a, b) => {
+    let val;
+    if (sortKey === "ticker") val = a.ticker.localeCompare(b.ticker);
+    else val = b[sortKey] - a[sortKey];
+    return sortDir === "desc" ? val : -val;
+  });
+
   function handleSort(key) {
     if (sortKey === key) setSortDir(d => d === "desc" ? "asc" : "desc");
     else { setSortKey(key); setSortDir("desc"); }
@@ -1330,9 +758,6 @@ const showRawTickerOption =
     setRecent((prev) => [stock.ticker, ...prev.filter((x) => x !== stock.ticker)].slice(0, 5));
     setPage("stock");
     setQuery("");
-    setTradeShares("");
-    setTradeError("");
-    setTradeMsg("");
   }
 
   function searchStock() {
@@ -1379,15 +804,7 @@ const showRawTickerOption =
 
   const sectors = ["ETFs", "Technology", "Energy", "Travel", "Healthcare", "Finance", "E-Commerce", "Consumer Goods", "Health & Fitness"];
 
-  
-
-
-
-
-
-
- 
-handleAuthSubmit(e) {
+  async function handleAuthSubmit(e) {
     e.preventDefault();
     setAuthError("");
     try {
@@ -1397,13 +814,6 @@ handleAuthSubmit(e) {
           await updateProfile(cred.user, { displayName: displayName.trim() });
           setUserName(displayName.trim());
         }
-        // Grant the $10,000 demo balance — only happens once, right here at signup.
-        await setDoc(doc(db, "users", cred.user.uid), {
-          email: cred.user.email,
-          displayName: displayName.trim() || cred.user.email.split("@")[0],
-          cash: STARTING_CASH,
-          createdAt: serverTimestamp(),
-        });
       } else {
         await signInWithEmailAndPassword(auth, email, password);
       }
@@ -1419,68 +829,6 @@ handleAuthSubmit(e) {
     setPage("account");
   }
 
-  function getMyPosition(ticker) {
-    return positions.find((p) => p.ticker === ticker);
-  }
-
-  async function executeTrade(type, ticker, name, shares, price) {
-    if (!authUser) { setTradeError("Sign in to trade."); return; }
-    const numShares = Number(shares);
-    if (!numShares || numShares <= 0) { setTradeError("Enter a valid number of shares."); return; }
-    if (!price || price <= 0) { setTradeError("Price unavailable — try again in a moment."); return; }
-
-    setTradeBusy(true);
-    setTradeError("");
-    setTradeMsg("");
-
-    const userRef = doc(db, "users", authUser.uid);
-    const positionRef = doc(db, "users", authUser.uid, "positions", ticker);
-    const total = Math.round(numShares * price * 100) / 100;
-
-    try {
-      await runTransaction(db, async (tx) => {
-        const userSnap = await tx.get(userRef);
-        const posSnap = await tx.get(positionRef);
-        const currentCash = userSnap.exists() ? (userSnap.data().cash || 0) : 0;
-        const currentPos = posSnap.exists() ? posSnap.data() : null;
-
-        if (type === "buy") {
-          if (total > currentCash) {
-            throw new Error(`Not enough cash. You have $${currentCash.toFixed(2)}, this trade costs $${total.toFixed(2)}.`);
-          }
-          const newShares = (currentPos?.shares || 0) + numShares;
-          const newCost = ((currentPos?.shares || 0) * (currentPos?.avgCost || 0) + total) / newShares;
-          tx.set(positionRef, { ticker, name, shares: newShares, avgCost: newCost, updatedAt: serverTimestamp() });
-          tx.update(userRef, { cash: currentCash - total });
-        } else {
-          // sell — no shorting, can only sell what you own
-          const ownedShares = currentPos?.shares || 0;
-          if (numShares > ownedShares + 1e-9) {
-            throw new Error(`You only own ${ownedShares} shares of ${ticker}.`);
-          }
-          const remaining = ownedShares - numShares;
-          if (remaining < 1e-6) {
-            tx.delete(positionRef);
-          } else {
-            tx.update(positionRef, { shares: remaining, updatedAt: serverTimestamp() });
-          }
-          tx.update(userRef, { cash: currentCash + total });
-        }
-      });
-
-      await addDoc(collection(db, "users", authUser.uid, "transactions"), {
-        ticker, name, type, shares: numShares, price, total, timestamp: serverTimestamp(),
-      });
-
-      setTradeMsg(`${type === "buy" ? "Bought" : "Sold"} ${numShares} share${numShares === 1 ? "" : "s"} of ${ticker} at $${price.toFixed(2)}.`);
-      setTradeShares("");
-    } catch (err) {
-      setTradeError(err.message || "Trade failed.");
-    } finally {
-      setTradeBusy(false);
-    }
-  }
-
   async function handleDeleteAccount() {
     if (!confirmDelete) { setConfirmDelete(true); return; }
     try {
@@ -1488,172 +836,11 @@ handleAuthSubmit(e) {
       setConfirmDelete(false);
       setUserName("Guest");
       setPage("account");
-    } catch {
+    } catch (err) {
       setAuthError("Please log out and log back in before deleting. (Firebase requires recent login)");
       setConfirmDelete(false);
     }
   }
-  async function loadSimulationHistory(tickerOverride) {
-  setSimLoading(true);
-  setSimError("");
-  setSimHistory(null);
-  setHasInvested(false);
-
-  try {
-    let tickerToLoad = tickerOverride;
-
-    if (!tickerToLoad) {
-      const source = searchIndex.length > 0 ? searchIndex : stocks;
-      const q = simSearch.trim().toLowerCase();
-
-      const match = source.find((s) =>
-        s.ticker.toLowerCase() === q ||
-        s.name.toLowerCase() === q ||
-        s.name.toLowerCase().includes(q) ||
-        s.ticker.toLowerCase().includes(q)
-      );
-
-      if (match) {
-        tickerToLoad = match.ticker;
-      } else {
-        try {
-          const searchRes = await fetch(
-            `${API}/search?q=${encodeURIComponent(simSearch.trim())}&limit=1`
-          );
-
-          const searchData = await searchRes.json();
-          const results = Array.isArray(searchData)
-            ? searchData
-            : (searchData.results || []);
-
-          tickerToLoad = results.length > 0
-            ? results[0].ticker
-            : (simTicker || simSearch).trim().split(" ")[0].toUpperCase();
-        } catch {
-          tickerToLoad = (simTicker || simSearch)
-            .trim()
-            .split(" ")[0]
-            .toUpperCase();
-        }
-      }
-    }
-
-    tickerToLoad = tickerToLoad.trim().toUpperCase();
-
-    const response = await fetch(
-      `${API}/simulation/history/${encodeURIComponent(tickerToLoad)}`
-    );
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      setSimError(data.error || `No historical data found for "${tickerToLoad}" — check the name or ticker and try again.`);
-      return;
-    }
-
-    setSimHistory(data);
-    setSimTicker(data.ticker);
-    setSimSearch(data.ticker);
-    setBuyIndex(0);
-    setCurrentIndex(0);
-  } catch (error) {
-    console.error("Simulation fetch error:", error);
-    setSimError(`Could not connect to backend: ${error.message}`);
-  } finally {
-    setSimLoading(false);
-  }
-}
-  async function askSimulatorAI() {
-    if (!simHistory || !hasInvested) {
-      setSimAiMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: "Load a stock, choose a buy date, enter an investment amount, and click Invest first. Then I can explain the result."
-        }
-      ]);
-      return;
-    }
-
-    const payload = {
-      ticker: simHistory.ticker,
-      buyDate: simHistory.dates[buyIndex],
-      currentDate: simHistory.dates[currentIndex],
-      buyPrice: Number(buyPrice).toFixed(2),
-      currentPrice: Number(currentPrice).toFixed(2),
-      investmentAmount: Number(investmentAmount).toFixed(2),
-      portfolioValue: Number(portfolioValue).toFixed(2),
-      profitLoss: Number(profitLoss).toFixed(2),
-      returnPercentage: Number(returnPercentage).toFixed(2),
-    };
-
-    setSimAiMessages((prev) => [
-      ...prev,
-      {
-        role: "user",
-        text: `Explain my ${payload.ticker} simulation from ${payload.buyDate} to ${payload.currentDate}.`
-      }
-    ]);
-
-    setSimAiLoading(true);
-
-    try {
-      const response = await fetch(`${API}/ai/simulator-explain`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(payload)
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "AI explanation failed");
-      }
-
-      setSimAiMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: data.reply
-        }
-      ]);
-    } catch (error) {
-      setSimAiMessages((prev) => [
-        ...prev,
-        {
-          role: "assistant",
-          text: `Sorry, I could not generate the AI explanation yet. ${error.message}`
-        }
-      ]);
-    } finally {
-      setSimAiLoading(false);
-    }
-  }
-
-function skipMonths(monthsToSkip) {
-  if (!simHistory) return;
-
-  const currentDate = new Date(simHistory.dates[currentIndex]);
-  const targetDate = new Date(currentDate);
-  targetDate.setMonth(targetDate.getMonth() + monthsToSkip);
-
-  let nextIndex = currentIndex;
-
-  for (let i = currentIndex; i < simHistory.dates.length; i++) {
-    const date = new Date(simHistory.dates[i]);
-
-    if (date >= targetDate) {
-      nextIndex = i;
-      break;
-    }
-
-    nextIndex = i;
-  }
-
-  setCurrentIndex(nextIndex);
-}
 
   return (
     <div className="app">
@@ -1703,126 +890,24 @@ function skipMonths(monthsToSkip) {
               <div className="insightBar" onClick={() => setPage("learn")}>
                 💡 Unsure what P/E Ratio means? Learn key metrics in simple English.
               </div>
-              {authUser ? (() => {
-                const livePos = positions.map(p => {
-                  const q = positionQuotes[p.ticker];
-                  const price = q?.price ?? p.avgCost;
-                  const value = price * p.shares;
-                  const change = q?.change ?? 0;
-                  const dayChange = value * change / 100;
-                  return { ...p, price, value, change, dayChange, name: q?.name || p.name || p.ticker };
-                });
-                const holdingsValue = livePos.reduce((sum, p) => sum + p.value, 0);
-                const totalValue = (cash || 0) + holdingsValue;
-                const totalDayChange = livePos.reduce((sum, p) => sum + p.dayChange, 0);
-                const totalDayPct = holdingsValue > 0 ? (totalDayChange / (holdingsValue - totalDayChange)) * 100 : 0;
-                const biggest = [...livePos].sort((a, b) => b.value - a.value)[0];
-
-                // Build donut pie by stock (top 4 + Others)
-                const STOCK_COLORS = ["#1f7d4c","#4caf50","#f4a623","#3498db","#9b59b6","#e67e22","#e87070","#1abc9c"];
-                const sorted4 = [...livePos].sort((a,b) => b.value - a.value);
-                const top4 = sorted4.slice(0, 4);
-                const othersVal = sorted4.slice(4).reduce((s,p) => s + p.value, 0);
-                const pieItems = othersVal > 0 ? [...top4, { ticker: "Others", value: othersVal }] : top4;
-                const pieTotal = pieItems.reduce((s,p) => s + p.value, 0) || 1;
-                let cumAngle = -Math.PI / 2;
-                const pieSlices = pieItems.map((p, i) => {
-                  const frac = p.value / pieTotal;
-                  const start = cumAngle;
-                  cumAngle += frac * 2 * Math.PI;
-                  const end = cumAngle;
-                  const r = 52, cx = 60, cy = 60;
-                  const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
-                  const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
-                  const large = frac > 0.5 ? 1 : 0;
-                  const d = pieItems.length === 1
-                    ? `M${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.01},${cy-r} Z`
-                    : `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
-                  return { ...p, frac, color: i === pieItems.length-1 && othersVal > 0 ? "#c8d8d0" : STOCK_COLORS[i], d };
-                });
-
-                return (
-                  <>
-                    <div className="card focusCard clickCard dashPortfolioCard" onClick={() => setPage("portfolio")}>
-                      <p className="dashPortLabel">Portfolio Value</p>
-                      <h2 className="dashPortValue">${totalValue.toFixed(2)}</h2>
-                      <div className="dashPortRow">
-                        <span className="dashPortCash">Cash ${(cash || 0).toFixed(2)}</span>
-                        {holdingsValue > 0 && (
-                          <span className={totalDayChange >= 0 ? "green dashPortChange" : "red dashPortChange"}>
-                            {totalDayChange >= 0 ? "▲" : "▼"} ${Math.abs(totalDayChange).toFixed(2)} ({Math.abs(totalDayPct).toFixed(2)}%) today
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="card clickCard dashBiggestCard" onClick={() => biggest && goStock(biggest)}>
-                      <h3 className="dashBiggestLabel">Biggest Holding</h3>
-                      {biggest ? (
-                        <>
-                          <div className="dashBiggestTop">
-                            <div>
-                              <div className="dashBiggestTicker">{biggest.ticker}</div>
-                              <div className="dashBiggestName">{biggest.name}</div>
-                            </div>
-                            <span className={biggest.change >= 0 ? "green dashBiggestChg" : "red dashBiggestChg"}>
-                              {biggest.change >= 0 ? "▲" : "▼"} {Math.abs(biggest.change).toFixed(2)}%
-                            </span>
-                          </div>
-                          <svg viewBox="0 0 120 40" className="dashSparkline">
-                            <polyline
-                              points={[10,30, 25,22, 40,26, 55,18, 70,20, 85,12, 100,8, 115,10].map((v,i)=>i%2===0?v:biggest.change>=0?v:40-v+8).join(" ")}
-                              fill="none"
-                              stroke={biggest.change >= 0 ? "#1f7d4c" : "#e87070"}
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            />
-                          </svg>
-                        </>
-                      ) : (
-                        <p className="sim-muted">No positions yet</p>
-                      )}
-                    </div>
-
-                    {livePos.length > 0 ? (
-                      <div className="card clickCard dashMixCard" onClick={() => setPage("portfolio")}>
-                        <h3>Holdings Mix</h3>
-                        <div className="dashMixInner">
-                          <svg viewBox="0 0 120 120" className="dashMixPie">
-                            {pieSlices.map((s, i) => (
-                              <path key={i} d={s.d} fill={s.color} stroke="white" strokeWidth="1.5">
-                                <title>{s.ticker}: {(s.frac*100).toFixed(1)}%</title>
-                              </path>
-                            ))}
-                            <circle cx="60" cy="60" r="26" fill="white" />
-                          </svg>
-                          <div className="dashMixLegend">
-                            {pieSlices.map((s, i) => (
-                              <div key={i} className="dashMixRow">
-                                <span className="dashMixDot" style={{ background: s.color }} />
-                                <span className="dashMixLabel">{s.ticker}</span>
-                                <span className="dashMixPct">{(s.frac*100).toFixed(0)}%</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="card clickCard" onClick={() => setPage("portfolio")}>
-                        <h3>Holdings</h3>
-                        <p className="sim-muted">Search for a stock to make your first trade.</p>
-                      </div>
-                    )}
-                  </>
-                );
-              })() : (
-                <div className="card focusCard clickCard tradeSignupCard" onClick={() => { setAuthMode("signup"); setPage("account"); }}>
-                  <h3>Sign up to get $10,000 demo cash 💰</h3>
-                  <p>Create a free account to start buying and selling real stocks at live prices.</p>
-                  <button className="sim-primary-btn">Sign up →</button>
-                </div>
-              )}
+              <div className="card focusCard clickCard" onClick={() => setPage("portfolio")}>
+                <p>Portfolio Value</p>
+                <h2>$12,736.40</h2>
+                <b className="green">↑ +27.25%</b>
+                <div className="miniLine">⌁⌁╱╲╱╲╱╲</div>
+              </div>
+              <div className="card clickCard" onClick={() => setPage("portfolio")}>
+                <h3>Biggest Holding</h3>
+                <h2>AAPL</h2>
+                <p>Apple Inc.</p>
+                <b className="green">↑ +1.18%</b>
+                <div className="miniLine">╱╲╱╲╱</div>
+              </div>
+              <div className="card clickCard" onClick={() => setPage("portfolio")}>
+                <h3>Holdings Mix</h3>
+                <div className="pie"></div>
+                <p>🟢 AAPL 45% &nbsp; 🟡 MSFT 30% &nbsp; 🔵 TSLA 15%</p>
+              </div>
               <div className="card">
                 <h3>Top Movers Today</h3>
                 {[...stocks].sort((a, b) => b.change - a.change).slice(0, 5).map((s) => (
@@ -2081,72 +1166,6 @@ function skipMonths(monthsToSkip) {
                 </div>
               </div>
 
-              {authUser ? (
-                <div className="card tradeCard">
-                  <h3>Trade {selectedStock.ticker}</h3>
-                  <p className="tradeHint">
-                    Demo trading — trades execute instantly at the current price shown above.
-                    Real markets only trade during market hours; here you can buy or sell any time, and fractional shares are fine.
-                  </p>
-
-                  <div className="tradeRow">
-                    <div className="tradeCashInfo">
-                      <span>Cash available</span>
-                      <strong>{cash != null ? `$${cash.toFixed(2)}` : "—"}</strong>
-                    </div>
-                    <div className="tradeCashInfo">
-                      <span>You own</span>
-                      <strong>{getMyPosition(selectedStock.ticker)?.shares ?? 0} shares</strong>
-                    </div>
-                  </div>
-
-                  <div className="sim-form">
-                    <div className="sim-field">
-                      <label>Shares</label>
-                      <input
-                        className="sim-input"
-                        type="number"
-                        min="0"
-                        step="0.0001"
-                        placeholder="e.g. 2.5"
-                        value={tradeShares}
-                        onChange={(e) => setTradeShares(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      className="sim-primary-btn"
-                      disabled={tradeBusy}
-                      onClick={() => executeTrade("buy", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
-                    >
-                      Buy at ${stockDetail?.price_fmt || "—"}
-                    </button>
-                    <button
-                      className="sim-primary-btn tradeSellBtn"
-                      disabled={tradeBusy}
-                      onClick={() => executeTrade("sell", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
-                    >
-                      Sell
-                    </button>
-                  </div>
-
-                  {tradeShares && stockDetail?.price && (
-                    <p className="sim-muted">
-                      Estimated total: ${(Number(tradeShares) * stockDetail.price).toFixed(2)}
-                    </p>
-                  )}
-                  {tradeError && <p className="sim-error">{tradeError}</p>}
-                  {tradeMsg && <p className="sim-positive">{tradeMsg}</p>}
-                </div>
-              ) : (
-                <div className="card tradeCard tradeSignupCard">
-                  <h3>Want to trade {selectedStock.ticker}?</h3>
-                  <p>Sign up free to get $10,000 in demo cash and start buying and selling real stocks at live prices.</p>
-                  <button className="sim-primary-btn" onClick={() => { setAuthMode("signup"); setPage("account"); }}>
-                    Sign up to get $10,000 →
-                  </button>
-                </div>
-              )}
-
               <div className="card stockMetricsCard">
                 <div className="keyMetricsHeader">
                   <h3>Key Metrics</h3>
@@ -2168,25 +1187,12 @@ function skipMonths(monthsToSkip) {
                     debt:     stockDetail?.debt_to_equity_fmt,
                     roe:      stockDetail?.roe_fmt,
                   };
-                  const rawValue = stockDetail ? liveValues[m.key] : null;
-
-                  const displayValue =
-                    rawValue === null ||
-                    rawValue === undefined ||
-                    rawValue === "" ||
-                    String(rawValue).toLowerCase().includes("nan")
-                      ? "—"
-                      : rawValue;
+                  const displayValue = stockDetail ? (liveValues[m.key] ?? "N/A") : "—";
                   return (
                   <div key={m.key} className="metricLine">
                     <b>
                       {m.name}
-                      <button className="metricBubble" onClick={(e) => { e.stopPropagation(); setOpenMetric(m); }}
-                        onMouseEnter={(e) => {
-                          const r = e.currentTarget.getBoundingClientRect();
-                          const tip = e.currentTarget.querySelector('.metricBubbleTip');
-                          if (tip) { tip.style.top = r.top + r.height/2 + 'px'; tip.style.left = (r.left - 230) + 'px'; }
-                        }}>?
+                      <button className="metricBubble" onClick={(e) => { e.stopPropagation(); setOpenMetric(m); }}>?
                         <span className="metricBubbleTip">{m.short}</span>
                       </button>
                     </b>
@@ -2202,167 +1208,47 @@ function skipMonths(monthsToSkip) {
         {page === "portfolio" && (
           <section className="page">
             <h1>My Portfolio</h1>
-
-            {!authUser ? (
-              <div className="card tradeSignupCard">
-                <h2>Sign up now to get $10,000 demo cash 💰</h2>
-                <p>Create a free account and start buying and selling real stocks at live prices — no real money, no risk, just practice.</p>
-                <button className="sim-primary-btn" onClick={() => { setAuthMode("signup"); setPage("account"); }}>
-                  Sign up to get $10,000 →
-                </button>
+            <div className="stats">
+              <div className="card"><p>Total Value</p><h2>$12,736.40</h2></div>
+              <div className="card"><p>Daily P&L</p><h2 className="green">↑ +$263.20</h2></div>
+              <div className="card"><p>Cash Balance</p><h2>$1,234.50</h2></div>
+            </div>
+            <div className="card">
+              <h3>Portfolio Allocation</h3>
+              <div className="pie bigPie"></div>
+            </div>
+            <div className="card">
+              <h3>Positions</h3>
+              <div className="table head">
+                {[
+                  ["ticker", "Stock"],
+                  ["change", "% Change"],
+                  ["price", "Current Price"],
+                  ["value", "Value"],
+                  ["unrealised", "Unrealised P&L"],
+                  ["realised", "Realised P&L"],
+                  ["qty", "Qty"],
+                ].map(([key, label]) => (
+                  <button key={key} onClick={() => handleSort(key)}>
+                    {label} {sortKey === key ? (sortDir === "desc" ? "↓" : "↑") : ""}
+                  </button>
+                ))}
               </div>
-            ) : (
-              <>
-                {(() => {
-                  const livePositions = positions.map((p) => {
-                    const q = positionQuotes[p.ticker];
-                    const price = q?.price ?? p.avgCost;
-                    const value = price * p.shares;
-                    const unrealised = (price - p.avgCost) * p.shares;
-                    return { ...p, price, change: q?.change ?? 0, value, unrealised, name: q?.name || p.name || p.ticker };
-                  });
-                  const holdingsValue = livePositions.reduce((sum, p) => sum + p.value, 0);
-                  const totalValue = (cash || 0) + holdingsValue;
-                  const totalUnrealised = livePositions.reduce((sum, p) => sum + p.unrealised, 0);
-
-                  const sorted = [...livePositions].sort((a, b) => {
-                    let val;
-                    if (sortKey === "ticker") val = a.ticker.localeCompare(b.ticker);
-                    else val = (b[sortKey] ?? 0) - (a[sortKey] ?? 0);
-                    return sortDir === "desc" ? val : -val;
-                  });
-
-                  return (
-                    <>
-                      <div className="stats">
-                        <div className="card"><p>Total Value</p><h2>${totalValue.toFixed(2)}</h2></div>
-                        <div className="card">
-                          <p>Unrealised P&L</p>
-                          <h2 className={totalUnrealised >= 0 ? "green" : "red"}>
-                            {totalUnrealised >= 0 ? "↑" : "↓"} ${Math.abs(totalUnrealised).toFixed(2)}
-                          </h2>
-                        </div>
-                        <div className="card"><p>Cash Balance</p><h2>${(cash || 0).toFixed(2)}</h2></div>
-                      </div>
-
-                      <div className="portfolioMainRow">
-                        <div className="card portfolioPositionsCard">
-                          <h3>Positions</h3>
-                          {livePositions.length === 0 ? (
-                            <p className="sim-muted">No positions yet — search for a stock and buy your first share.</p>
-                          ) : (
-                            <>
-                              <div className="table head">
-                                {[
-                                  ["ticker", "Stock"],
-                                  ["change", "% Change"],
-                                  ["price", "Current Price"],
-                                  ["value", "Value"],
-                                  ["unrealised", "Unrealised P&L"],
-                                  ["shares", "Qty"],
-                                ].map(([key, label]) => (
-                                  <button key={key} onClick={() => handleSort(key)}>
-                                    {label} {sortKey === key ? (sortDir === "desc" ? "↓" : "↑") : ""}
-                                  </button>
-                                ))}
-                              </div>
-                              {sorted.map((h) => (
-                                <div className="table tableClickable" key={h.ticker} onClick={() => goStock(h)}>
-                                  <b>
-                                    <span className="rowTicker">{h.ticker}</span>
-                                    <small className="rowName">{h.name}</small>
-                                  </b>
-                                  <span className={h.change >= 0 ? "green" : "red"}>{h.change >= 0 ? "↑" : "↓"} {h.change}%</span>
-                                  <span>${Number(h.price).toFixed(2)}</span>
-                                  <span>${h.value.toFixed(2)}</span>
-                                  <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised).toFixed(2)}</span>
-                                  <span>{h.shares}</span>
-                                </div>
-                              ))}
-                            </>
-                          )}
-                        </div>
-
-                        {livePositions.length > 0 && (() => {
-                          const STOCK_COLORS = ["#1f7d4c","#4caf50","#f4a623","#3498db","#9b59b6","#e67e22","#e87070","#1abc9c"];
-                          const sorted = [...livePositions].sort((a,b) => b.value - a.value);
-                          const top4 = sorted.slice(0, 4);
-                          const othersVal = sorted.slice(4).reduce((s,p) => s + p.value, 0);
-                          const pieItems = othersVal > 0 ? [...top4, { ticker: "Others", name: "Others", value: othersVal }] : top4;
-                          const pieTotal = pieItems.reduce((s,p) => s + p.value, 0) || 1;
-                          let cumAngle = -Math.PI / 2;
-                          const slices = pieItems.map((p, i) => {
-                            const frac = p.value / pieTotal;
-                            const start = cumAngle;
-                            cumAngle += frac * 2 * Math.PI;
-                            const end = cumAngle;
-                            const r = 70, cx = 80, cy = 80;
-                            const x1 = cx + r * Math.cos(start), y1 = cy + r * Math.sin(start);
-                            const x2 = cx + r * Math.cos(end),   y2 = cy + r * Math.sin(end);
-                            const large = frac > 0.5 ? 1 : 0;
-                            const d = pieItems.length === 1
-                              ? `M${cx},${cy-r} A${r},${r} 0 1,1 ${cx-0.01},${cy-r} Z`
-                              : `M${cx},${cy} L${x1},${y1} A${r},${r} 0 ${large},1 ${x2},${y2} Z`;
-                            const color = (i === pieItems.length-1 && othersVal > 0) ? "#c8d8d0" : STOCK_COLORS[i];
-                            return { ticker: p.ticker, frac, color, d };
-                          });
-                          return (
-                            <div className="card portfolioAllocationCard">
-                              <h3>Allocation</h3>
-                              <svg viewBox="0 0 160 160" className="allocPie">
-                                {slices.map((s, i) => (
-                                  <path key={i} d={s.d} fill={s.color} stroke="white" strokeWidth="2">
-                                    <title>{s.ticker}: {(s.frac*100).toFixed(1)}%</title>
-                                  </path>
-                                ))}
-                                <circle cx="80" cy="80" r="36" fill="white" />
-                                <text x="80" y="76" textAnchor="middle" fontSize="9" fontWeight="700" fill="#173427">Holdings</text>
-                                <text x="80" y="90" textAnchor="middle" fontSize="8" fill="#6c8373">${holdingsValue.toFixed(0)}</text>
-                              </svg>
-                              <div className="allocLegend">
-                                {slices.map((s, i) => (
-                                  <div key={i} className="allocLegendRow">
-                                    <span className="allocDot" style={{ background: s.color }} />
-                                    <span className="allocName">{s.ticker}</span>
-                                    <span className="allocPct">{(s.frac*100).toFixed(1)}%</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          );
-                        })()}
-                      </div>
-                    </>
-                  );
-                })()}
-
-                <div className="card">
-                  <h3>Recent Trades</h3>
-                  {txLog.length === 0 ? (
-                    <p className="sim-muted">No trades yet.</p>
-                  ) : (
-                    <>
-                      <div className="table head" style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
-                        <span>Action</span>
-                        <span>Stock</span>
-                        <span>Qty</span>
-                        <span>Price</span>
-                        <span>Total</span>
-                      </div>
-                      {txLog.map((t) => (
-                        <div className="table" key={t.id} style={{ gridTemplateColumns: "1fr 1fr 1fr 1fr 1fr" }}>
-                          <span className={t.type === "buy" ? "green" : "red"}>{t.type === "buy" ? "Bought" : "Sold"}</span>
-                          <b>{t.ticker}</b>
-                          <span>{Number(t.shares).toFixed(4).replace(/\.?0+$/, "")} shares</span>
-                          <span>@ ${Number(t.price).toFixed(2)}</span>
-                          <span>${Number(t.total).toFixed(2)}</span>
-                        </div>
-                      ))}
-                    </>
-                  )}
+              {sortedHoldings.map((h) => (
+                <div className="table" key={h.ticker}>
+                  <b>
+                    <span className="rowTicker">{h.ticker}</span>
+                    <small className="rowName">{h.name}</small>
+                  </b>
+                  <span className={h.change >= 0 ? "green" : "red"}>{h.change >= 0 ? "↑" : "↓"} {h.change}%</span>
+                  <span>${h.price}</span>
+                  <span>${h.value.toFixed(2)}</span>
+                  <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised)}</span>
+                  <span>${h.realised}</span>
+                  <span>{h.qty}</span>
                 </div>
-              </>
-            )}
+              ))}
+            </div>
           </section>
         )}
 
@@ -2375,17 +1261,9 @@ function skipMonths(monthsToSkip) {
             </div>
 
             {learnSection === "basics" && (
-              <div className="basicsGrid">
-                <div className="basicsIntro">
-                  <span className="basicsIntroIcon">🌱</span>
-                  <div>
-                    <h3>Investing basics, explained simply</h3>
-                    <p>Click any card to expand a beginner-friendly explanation with visuals. Start here if you're new to investing.</p>
-                  </div>
-                </div>
-                {basicsData.map((item) => (
-                  <BasicsCard key={item.key} item={item} onNavigate={(p) => setPage(p)} />
-                ))}
+              <div className="card">
+                <h3>Coming Soon</h3>
+                <p>This learning section will be developed in a later milestone.</p>
               </div>
             )}
 
@@ -2440,13 +1318,16 @@ function skipMonths(monthsToSkip) {
                     <input value="Email / Password" readOnly className="readonlyInput"/>
                   </div>
 
+                  {authError && <p className="authError">{authError}</p>}
+
                   <button className="logoutBtn" onClick={handleLogout}>Log Out</button>
 
                   <div className="dangerZone">
+                    <p className="dangerLabel">Danger Zone</p>
                     {confirmDelete
                       ? <div className="confirmDeleteRow">
                           <span>Are you sure? This cannot be undone.</span>
-                          <button className="deleteBtn" onClick={handleDeleteAccount}>Yes, delete my account</button>
+                          <button className="deleteBtn" onClick={handleDeleteAccount}>Yes, delete</button>
                           <button className="cancelDeleteBtn" onClick={() => setConfirmDelete(false)}>Cancel</button>
                         </div>
                       : <button className="deleteBtn" onClick={handleDeleteAccount}>Delete Account</button>
@@ -2502,314 +1383,7 @@ function skipMonths(monthsToSkip) {
           </section>
         )}
 
-        {page === "simulator" && (
-          <section className="page">
-            <h1>SIMULATOR</h1>
-
-            <div className="sim-layout">
-              <div className="sim-main-column">
-                <div className="card simulator-card">
-              <h2>Historical Investment Simulator</h2>
-              <p>
-                Pick a stock, choose a buy date, invest virtual money, then scrub forward
-                to see how the price and your portfolio would have changed.
-              </p>
-
-              <div className="sim-form">
-                <div className="sim-field sim-search-field">
-                  <label>Search by company name or ticker</label>
-  
-                  <input
-                  className="sim-input"
-                  value={simSearch}
-                  onFocus={() => setShowSimDropdown(true)}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setSimSearch(value);
-                    setSimTicker(value.trim().split(" ")[0].toUpperCase());
-                    setShowSimDropdown(true);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      setShowSimDropdown(false);
-                      loadSimulationHistory();
-                    }
-                  }}
-                  placeholder="e.g. Apple, Tesla, VOO, MSFT..."
-                />
-
-                  {showSimDropdown && simSearch.trim() && (
-                    <div className="sim-search-dropdown">
-                      {simSearchResults.map((stock) => (
-                        <button
-                          key={stock.ticker}
-                          type="button"
-                          className="sim-search-option"
-                          onClick={() => {
-                            setSimTicker(stock.ticker);
-                            setSimSearch(stock.ticker);
-                            setShowSimDropdown(false);
-                            setSimHistory(null);
-                            setHasInvested(false);
-                            loadSimulationHistory(stock.ticker);
-                          }}
-                        >
-                          <div className="sim-search-left">
-                            <div className="sim-search-avatar">
-                              {stock.ticker[0]}
-                            </div>
-
-                            <div className="sim-search-text">
-                              <div className="sim-search-topline">
-                                <span className="sim-search-ticker">{stock.ticker}</span>
-                                <span className="sim-search-name">{stock.name}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="sim-search-sector">
-                            {stock.sector}
-                          </div>
-                        </button>
-                      ))}
-
-                      {showRawTickerOption && (
-                        <button
-                          type="button"
-                          className="sim-search-option"
-                          onClick={() => {
-                            setSimTicker(cleanSimSearch);
-                            setSimSearch(cleanSimSearch);
-                            setShowSimDropdown(false);
-                            setSimHistory(null);
-                            setHasInvested(false);
-                          }}
-                        >
-                          <div className="sim-search-left">
-                            <div className="sim-search-avatar">
-                              {cleanSimSearch[0]}
-                            </div>
-
-                            <div className="sim-search-text">
-                              <div className="sim-search-topline">
-                                <span className="sim-search-ticker">{cleanSimSearch}</span>
-                                <span className="sim-search-name">Use this ticker</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="sim-search-sector">
-                            Custom
-                          </div>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
-
-                <button className="sim-primary-btn" onClick={() => loadSimulationHistory()}>
-                  Load 10-Year History
-                </button>
-              </div>
-
-              {simLoading && <p className="sim-muted">Loading historical stock data...</p>}
-              {simError && <p className="sim-error">{simError}</p>}
-
-              {simHistory && (
-                <>
-                  <div className="sim-loaded-header">
-                    <div>
-                      <span className="sim-loaded-name">{simHistory.name || simHistory.ticker}</span>
-                      <span className="sim-loaded-ticker">{simHistory.ticker}</span>
-                    </div>
-                    <div className="sim-current-price sim-current-price--inline">
-                      <span>Current Price</span>
-                      <strong>${simHistory.prices[simHistory.prices.length - 1]}</strong>
-                    </div>
-                  </div>
-
-                  <h3>1. Choose your buy date</h3>
-
-                  <input
-                    className="sim-slider"
-                    type="range"
-                    min="0"
-                    max={simHistory.dates.length - 1}
-                    value={buyIndex}
-                    onChange={(e) => {
-                      const newIndex = Number(e.target.value);
-                      setBuyIndex(newIndex);
-                      setCurrentIndex(newIndex);
-                      setHasInvested(false);
-                    }}
-                  />
-
-                  <p>
-                    Buy Date: {simHistory.dates[buyIndex]} | Buy Price: ${buyPrice}
-                  </p>
-
-                  <h3>2. Choose investment amount</h3>
-
-                  <div className="sim-form">
-                    <div className="sim-field">
-                      <label>Investment Amount</label>
-                      <input
-                      className="sim-input"
-                      type="number"
-                      value={investmentAmount}
-                      onChange={(e) => setInvestmentAmount(Number(e.target.value))}
-                    />
-                    </div>
-
-                    <button className="sim-primary-btn" onClick={() => setHasInvested(true)}>
-                      Invest ${investmentAmount}
-                    </button>
-                  </div>
-
-                  {hasInvested && (
-                    <>
-                      <div className="card sim-chart-card">
-                        <div className="sim-chart-header">
-                          <div>
-                            <h3>Price Chart</h3>
-                            <p>
-                              {simHistory.dates[buyIndex]} to {simHistory.dates[currentIndex]}
-                            </p>
-                          </div>
-
-                          <div className="sim-current-price">
-                            <span>Current Price</span>
-                            <strong>${currentPrice}</strong>
-                          </div>
-                        </div>
-
-                        <SimulatorChart
-                          history={simHistory}
-                          buyIndex={buyIndex}
-                          currentIndex={currentIndex}
-                        />
-
-                        <div className="sim-scrubber-panel">
-                          <div className="sim-scrubber-top">
-                            <h3>Scrub forward through history</h3>
-                            <p>
-                              Current Date: {simHistory.dates[currentIndex]}
-                            </p>
-                          </div>
-
-                          <input
-                            className="sim-slider"
-                            type="range"
-                            min={buyIndex}
-                            max={simHistory.dates.length - 1}
-                            value={currentIndex}
-                            onChange={(e) => setCurrentIndex(Number(e.target.value))}
-                          />
-
-                          <div className="skip-buttons">
-                            <button onClick={() => skipMonths(1)}>+1M</button>
-                            <button onClick={() => skipMonths(4)}>+4M</button>
-                            <button onClick={() => skipMonths(6)}>+6M</button>
-                            <button onClick={() => skipMonths(12)}>+1Y</button>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="metric-grid">
-                        <div className="card">
-                          <h3>Shares Bought</h3>
-                          <p>{sharesBought.toFixed(4)}</p>
-                        </div>
-
-                        <div className="card">
-                          <h3>Portfolio Value</h3>
-                          <p>${portfolioValue.toFixed(2)}</p>
-                        </div>
-
-                        <div className="card">
-                          <h3>Profit / Loss</h3>
-                          <p className={profitLoss >= 0 ? "sim-positive" : "sim-negative"}>
-                            {profitLoss >= 0 ? "+" : "-"}${Math.abs(profitLoss).toFixed(2)}
-                          </p>
-                        </div>
-
-                        <div className="card">
-                          <h3>Return</h3>
-                          <p className={returnPercentage >= 0 ? "sim-positive" : "sim-negative"}>
-                            {returnPercentage >= 0 ? "+" : "-"}{Math.abs(returnPercentage).toFixed(2)}%
-                          </p>
-                        </div>
-
-                        <div className="card">
-                          <h3>Volume</h3>
-                          <p>{currentVolume.toLocaleString()}</p>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-              </div>
-            </div>
-
-            <aside className="sim-ai-panel sim-ai-side">
-              <div className="sim-ai-header">
-                <div>
-                  <h3>StockSense AI Coach</h3>
-                  <p>Ask AI to explain your simulator result in simple English.</p>
-                </div>
-                <span className="sim-ai-badge">AI</span>
-              </div>
-
-              <div className="sim-ai-chat">
-                {simAiMessages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={
-                      message.role === "user"
-                        ? "sim-ai-message user"
-                        : "sim-ai-message assistant"
-                    }
-                  >
-                    {message.text}
-                  </div>
-                ))}
-
-                {simAiLoading && (
-                  <div className="sim-ai-message assistant">
-                    Thinking through your simulation...
-                  </div>
-                )}
-              </div>
-
-              <button
-                className="sim-ai-button"
-                onClick={askSimulatorAI}
-                disabled={simAiLoading}
-              >
-                {simAiLoading ? "Explaining..." : "Explain this move"}
-              </button>
-
-              <button
-                className="sim-ai-secondary"
-                onClick={() =>
-                  setSimAiMessages([
-                    {
-                      role: "assistant",
-                      text: "I can explain what happened to your historical investment once you load a stock, invest virtual money, and scrub forward."
-                    }
-                  ])
-                }
-              >
-                Clear chat
-              </button>
-            </aside>
-            </div>
-            </section>
-          
-        )}
-
-        {["ai", "leaderboard"].includes(page) && (
+        {["simulator", "ai", "leaderboard"].includes(page) && (
           <section className="page">
             <h1>{page.toUpperCase()}</h1>
             <div className="card">
