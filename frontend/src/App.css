@@ -3662,6 +3662,48 @@ body {
 .aiChatInputRow button:disabled { opacity: 0.6; cursor: default; }
 .aiChatLevelRow { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; flex-wrap: wrap; }
 .aiChatLevelRow span { font-size: 0.85rem; color: #5a7868; font-weight: 600; }
+.aiLevelChip {
+  border: 1px solid #d8e5d9;
+  background: white;
+  color: #305340;
+  padding: 8px 16px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: 0.15s ease;
+}
+.aiLevelChip:hover { background: #f0faf3; border-color: #b9d9c1; }
+.aiLevelChip.chipActive {
+  background: linear-gradient(135deg, #1f7d4c, #28a85d) !important;
+  border-color: transparent;
+  color: white !important;
+}
+.aiChatHeaderRow { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.aiChatClearBtn {
+  border: 1px solid #e2ede4;
+  background: white;
+  color: #5a7868;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.aiChatClearBtn:hover { background: #f7fbf8; color: #1f5f41; }
+.aiChatLongHint {
+  font-size: 0.75rem;
+  color: #a5762e;
+  background: #fdf3e0;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
 .aiDisclaimer { margin-top: 10px; font-size: 0.78rem; color: #829589; text-align: center; }
 .staleNotice {
   font-size: 0.75rem;
@@ -3687,7 +3729,7 @@ body {
 .quizDiffCard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(31,125,76,0.12); }
 .quizDiffCard h3 { margin: 0 0 6px 0; }
 .quizDiffCard p { color: #5a7868; font-size: 0.88rem; margin: 0 0 14px 0; }
-.quizDiffBest { font-size: 0.8rem; font-weight: 700; color: #1f7d4c; }
+.quizDiffBest { font-size: 0.8rem; font-weight: 700; color: #1f7d4c; margin-bottom: 18px; }
 .quizCard {
   background: white;
   border: 1px solid #e2ede4;
@@ -3745,22 +3787,13 @@ body {
   background: linear-gradient(135deg, #1f7d4c, #28a85d);
   color: white;
   border-radius: 12px;
-  padding: 10px 14px;
+  padding: 12px 14px;
   font-weight: 700;
   cursor: pointer;
-  font-size: 0.85rem;
+  font-size: 0.9rem;
+  transition: opacity 0.15s ease;
 }
-.quizAiBtn {
-  flex: 1;
-  border: 1px solid #cfe3d4;
-  background: #f7fbf8;
-  color: #1f7d4c;
-  border-radius: 12px;
-  padding: 10px 14px;
-  font-weight: 700;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
+.quizStartBtn:disabled { opacity: 0.7; cursor: default; }
 .quizAiTag {
   display: inline-block;
   margin-left: 10px;
@@ -3805,9 +3838,17 @@ body {
   font-weight: 700;
   cursor: pointer;
   flex-shrink: 0;
+  transform: scale(1);
+  transition: transform 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
 }
-.leaderboardToggle.on { background: linear-gradient(135deg, #1f7d4c, #28a85d); color: white; }
+.leaderboardToggle.on { background: linear-gradient(135deg, #1f7d4c, #28a85d); color: white; box-shadow: 0 4px 14px rgba(31,125,76,0.3); }
 .leaderboardToggle.off { background: #eef3ef; color: #173427; }
+.leaderboardToggle.justToggled { animation: leaderboardTogglePulse 0.4s ease; }
+@keyframes leaderboardTogglePulse {
+  0%   { transform: scale(1); }
+  40%  { transform: scale(1.12); }
+  100% { transform: scale(1); }
+}
 .leaderboardTable {
   background: white;
   border: 1px solid #e2ede4;
@@ -3831,3 +3872,26 @@ body {
 .leaderboardYou { font-size: 0.72rem; color: #1f7d4c; margin-left: 6px; font-weight: 700; }
 .leaderboardValue { font-weight: 800; }
 .leaderboardEmpty { padding: 30px; text-align: center; color: #5a7868; }
+
+/* ── NEWS CARDS (dashboard + stock page) ─────────────────────────────── */
+
+.dashNewsCard, .stockNewsCard { display: flex; flex-direction: column; }
+.dashNewsItem, .stockNewsItem {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 0;
+  border-bottom: 1px solid #f0f5f1;
+  text-decoration: none;
+  color: inherit;
+}
+.dashNewsItem:last-child, .stockNewsItem:last-child { border-bottom: none; }
+.dashNewsHeadline, .stockNewsHeadline {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: #173427;
+  line-height: 1.35;
+}
+.dashNewsItem:hover .dashNewsHeadline,
+.stockNewsItem:hover .stockNewsHeadline { color: #1f7d4c; text-decoration: underline; }
+.dashNewsSource, .stockNewsMeta { font-size: 0.75rem; color: #8a9e90; }

@@ -40,6 +40,47 @@ def _yahoo_quote(ticker: str) -> dict:
     return results[0]
 
 
+def _yahoo_quote_summary(ticker: str) -> dict:
+    """
+    Fallback for fundamentals when yfinance's t.info gets rate-limited/blocked
+    (very common on cloud hosts like Render). Hits Yahoo's quoteSummary API
+    directly for the modules that cover dividendYield, beta, debtToEquity,
+    returnOnEquity, trailingPE, marketCap, trailingEps — the fields that
+    _yahoo_quote() alone doesn't provide.
+    Returns a flat dict merging summaryDetail + defaultKeyStatistics + financialData.
+    Raises on failure so callers can decide how to handle it.
+    """
+    url = f"https://query1.finance.yahoo.com/v10/finance/quoteSummary/{ticker.upper()}"
+    params = {"modules": "summaryDetail,defaultKeyStatistics,financialData,price"}
+    res = requests.get(url, headers=HEADERS, params=params, timeout=10)
+    res.raise_for_status()
+
+    data = res.json()
+    result = data.get("quoteSummary", {}).get("result")
+    if not result:
+        raise ValueError(f"No quoteSummary data for {ticker}")
+
+    modules = result[0]
+
+    def _raw(module, key):
+        val = (modules.get(module, {}) or {}).get(key)
+        if isinstance(val, dict):
+            return val.get("raw")
+        return val
+
+    return {
+        "trailingPE": _raw("summaryDetail", "trailingPE") or _raw("defaultKeyStatistics", "trailingEps"),
+        "marketCap": _raw("price", "marketCap") or _raw("summaryDetail", "marketCap"),
+        "dividendYield": _raw("summaryDetail", "dividendYield"),
+        "trailingEps": _raw("defaultKeyStatistics", "trailingEps"),
+        "beta": _raw("defaultKeyStatistics", "beta") or _raw("summaryDetail", "beta"),
+        "debtToEquity": _raw("financialData", "debtToEquity"),
+        "returnOnEquity": _raw("financialData", "returnOnEquity"),
+        "averageVolume": _raw("summaryDetail", "averageVolume"),
+        "longName": _raw("price", "longName") or _raw("price", "shortName"),
+    }
+
+
 def _safe(value, default=None):
     """Return default if value is NaN / None / inf."""
     if value is None:
@@ -152,6 +193,19 @@ def fetch_stock_detail(ticker: str) -> dict:
             info.setdefault("trailingEps", q.get("epsTrailingTwelveMonths"))
             info.setdefault("averageVolume", q.get("averageDailyVolume3Month"))
             info.setdefault("longName", q.get("longName") or q.get("shortName"))
+        except Exception:
+            pass
+
+    # Third-tier fallback: dividendYield / beta / debtToEquity / returnOnEquity
+    # aren't covered by the lightweight quote endpoint above, so if they're
+    # still missing (t.info blocked entirely), hit quoteSummary directly.
+    needed = ("dividendYield", "beta", "debtToEquity", "returnOnEquity", "trailingPE", "marketCap", "trailingEps")
+    if any(not info.get(k) for k in needed):
+        try:
+            qs = _yahoo_quote_summary(ticker)
+            for k, v in qs.items():
+                if v is not None:
+                    info.setdefault(k, v)
         except Exception:
             pass
 
@@ -418,31 +472,90 @@ def fetch_indices() -> list:
     """
     Returns current price + daily % change for the three main indices.
     [{"name": "S&P 500", "value": "5,304.72", "change": 0.51}, ...]
+
+    Each index is cached individually (via cache.cached) so that if one
+    ticker's live fetch fails (e.g. market closed, Yahoo hiccup), we serve
+    its last known good price instead of "N/A" — and a bad fetch for one
+    ticker never wipes out good cached data for the others.
     """
+    import cache as _cache
+
     results = []
     for name, ticker in INDEX_TICKERS.items():
+        def _fetch_one(ticker=ticker, name=name):
+            price = None
+            prev = None
+            try:
+                t = _ticker(ticker)
+                info = t.info
+                price = _safe(info.get("regularMarketPrice") or info.get("currentPrice"))
+                prev = _safe(info.get("previousClose") or info.get("regularMarketPreviousClose"))
+            except Exception:
+                pass
+
+            if price is None:
+                # yfinance .info is frequently blocked on cloud hosts — fall
+                # back to the lighter Yahoo quote endpoint.
+                q = _yahoo_quote(ticker)
+                price = _safe(q.get("regularMarketPrice"))
+                prev = _safe(q.get("regularMarketPreviousClose"))
+
+            if price is None:
+                raise ValueError(f"No price for {ticker}")
+
+            change_pct = round((price - prev) / prev * 100, 2) if price and prev else 0.0
+
+            return {
+                "name": name,
+                "ticker": ticker,
+                "value": f"{price:,.2f}",
+                "value_raw": price,
+                "change": change_pct,
+            }
+
         try:
-            t = _ticker(ticker)
-            info = t.info
-            price = _safe(info.get("regularMarketPrice") or info.get("currentPrice"))
-            prev  = _safe(info.get("previousClose") or info.get("regularMarketPreviousClose"))
-
-            if price and prev:
-                change_pct = round((price - prev) / prev * 100, 2)
-            else:
-                change_pct = 0.0
-
-            results.append({
-                "name":       name,
-                "ticker":     ticker,
-                "value":      f"{price:,.2f}" if price else "N/A",
-                "value_raw":  price,
-                "change":     change_pct,
-            })
+            data = _cache.cached(f"market:index:{ticker}", _cache.TTL_INDICES, _fetch_one)
+            results.append(data)
         except Exception:
             results.append({"name": name, "ticker": ticker, "value": "N/A", "change": 0.0})
 
     return results
+
+
+# ---------------------------------------------------------------------------
+# Daily market news — general financial headlines for the dashboard
+# ---------------------------------------------------------------------------
+
+def fetch_market_news(limit: int = 8) -> list:
+    """
+    General market/finance headlines (not tied to a specific ticker), for
+    the dashboard "Market News" card. Uses Finnhub's general-news endpoint.
+    """
+    import os
+
+    api_key = os.getenv("FINNHUB_API_KEY")
+    if not api_key:
+        return []
+
+    res = requests.get(
+        "https://finnhub.io/api/v1/news",
+        params={"category": "general", "token": api_key},
+        timeout=10,
+    )
+    res.raise_for_status()
+    raw = res.json()
+
+    articles = []
+    for item in raw[:limit]:
+        articles.append({
+            "headline": item.get("headline"),
+            "source": item.get("source"),
+            "summary": item.get("summary"),
+            "url": item.get("url"),
+            "image": item.get("image"),
+            "datetime": item.get("datetime"),
+        })
+    return articles
 
 
 # ---------------------------------------------------------------------------

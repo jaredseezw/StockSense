@@ -3,6 +3,7 @@ from google import genai
 from google.genai import types
 import os
 import requests
+import time
 from datetime import datetime
 
 def format_finnhub_date(timestamp):
@@ -12,6 +13,22 @@ def format_finnhub_date(timestamp):
         return "Unknown date"
 
 ai_bp = Blueprint("ai", __name__)
+
+# ---------------------------------------------------------------------------
+# Quota cooldown — when Gemini returns RESOURCE_EXHAUSTED / 429, don't keep
+# hammering it on every message (that just burns more quota and makes the
+# user wait for a call that's going to fail anyway). Back off for a bit and
+# return the friendly fallback immediately instead.
+# ---------------------------------------------------------------------------
+_quota_cooldown_until = 0
+_QUOTA_COOLDOWN_SECONDS = 90
+
+def _in_quota_cooldown():
+    return time.time() < _quota_cooldown_until
+
+def _start_quota_cooldown():
+    global _quota_cooldown_until
+    _quota_cooldown_until = time.time() + _QUOTA_COOLDOWN_SECONDS
 
 
 @ai_bp.route("/ai/simulator-explain", methods=["POST"])
@@ -83,6 +100,16 @@ def explain_simulator():
         return jsonify({
             "reply": fallback
         })
+
+    if _in_quota_cooldown():
+        fallback = (
+            f"You bought {ticker} on {buy_date} at about ${buy_price}. "
+            f"By {current_date}, the price was about ${current_price}. "
+            f"Your investment of ${investment_amount} became about ${portfolio_value}. "
+            f"That means your profit/loss was ${profit_loss}, or {return_percentage}%.\n\n"
+            "I'm handling a lot of requests right now, so here's a basic explanation — try again in a moment for the full AI breakdown."
+        )
+        return jsonify({"reply": fallback})
 
     try:
         client = genai.Client()
@@ -167,6 +194,7 @@ def explain_simulator():
         print("==================================")
 
         if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
+            _start_quota_cooldown()
             fallback = (
                 f"You bought {ticker} on {buy_date} at about ${buy_price}. "
                 f"By {current_date}, the price was about ${current_price}. "
@@ -207,6 +235,11 @@ def ai_chat():
             )
         })
 
+    if _in_quota_cooldown():
+        return jsonify({
+            "reply": "I'm handling a lot of requests right now — please try again in a moment."
+        })
+
     system_preamble = f"""
         You are StockSense AI, a friendly, encouraging investing and personal-finance tutor
         built into the StockSense app.
@@ -234,16 +267,9 @@ def ai_chat():
     try:
         client = genai.Client()
 
-        grounding_tool = types.Tool(
-            google_search=types.GoogleSearch()
-        )
-
         response = client.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
             contents=convo,
-            config=types.GenerateContentConfig(
-                tools=[grounding_tool],
-            ),
         )
 
         return jsonify({"reply": response.text})
@@ -256,6 +282,7 @@ def ai_chat():
         print("========================================")
 
         if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
+            _start_quota_cooldown()
             return jsonify({
                 "reply": "I'm handling a lot of requests right now — please try again in a moment."
             })
@@ -287,6 +314,9 @@ def generate_quiz():
 
     if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
         return jsonify({"error": "Gemini is not connected — use the static quiz bank instead."}), 503
+
+    if _in_quota_cooldown():
+        return jsonify({"error": "AI is busy right now — using the standard quiz bank instead."}), 503
 
     prompt = f"""
         Generate exactly 10 multiple-choice investing/finance quiz questions for {difficulty} level
@@ -347,6 +377,8 @@ def generate_quiz():
 
     except Exception as e:
         error_message = str(e)
+        if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
+            _start_quota_cooldown()
         print("========== GEMINI QUIZ ERROR ==========")
         print(error_message)
         print("========================================")

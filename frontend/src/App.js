@@ -544,54 +544,97 @@ const basicsData = [
   },
 ];
 
-// Static quiz bank — 3 difficulty levels, MCQ, scored out of 10.
+// Static quiz bank — 3 difficulty levels, each with a few question sets so
+// retakes (and AI-fallback moments) don't always show the exact same 10.
 const quizData = {
   basic: {
     label: "Basic",
     desc: "Start here if you're new to investing.",
-    questions: [
-      { q: "What does it mean to 'buy a stock'?", options: ["Lending money to a bank", "Buying a small ownership share in a company", "Buying a government bond", "Opening a savings account"], correct: 1 },
-      { q: "What is a stock market index like the S&P 500?", options: ["A single company's stock", "A basket that tracks many companies together", "A type of bank account", "A government tax"], correct: 1 },
-      { q: "If a stock's price goes up after you buy it, you have a...", options: ["Realized loss", "Unrealized gain", "Dividend", "Margin call"], correct: 1 },
-      { q: "What is diversification?", options: ["Putting all your money in one stock", "Spreading investments across different assets", "Buying only ETFs", "Day trading frequently"], correct: 1 },
-      { q: "What is an ETF?", options: ["A single stock", "A fund that holds a basket of stocks/assets, tradable like a stock", "A type of savings bond", "A crypto coin"], correct: 1 },
-      { q: "What does 'volume' refer to for a stock?", options: ["The number of shares traded in a period", "The company's total profit", "The stock's price", "The number of employees"], correct: 0 },
-      { q: "What is a dividend?", options: ["A fee charged by brokers", "A portion of company profit paid to shareholders", "A type of stock split", "A government tax on shares"], correct: 1 },
-      { q: "Why might someone hold cash instead of investing all of it?", options: ["Cash always earns more than stocks", "For safety, emergencies, and flexibility", "It's required by law", "Stocks can't be sold quickly"], correct: 1 },
-      { q: "What generally happens to a stock's price when a company reports much higher profit than expected?", options: ["It usually stays exactly flat", "It often tends to rise", "It always crashes", "Nothing, price only depends on volume"], correct: 1 },
-      { q: "What is 'risk' in investing?", options: ["The guarantee of losing money", "The chance that an investment's value could go down", "A fee charged by the stock exchange", "The interest rate on a savings account"], correct: 1 },
+    questionSets: [
+      [
+        { q: "What does it mean to 'buy a stock'?", options: ["Lending money to a bank", "Buying a small ownership share in a company", "Buying a government bond", "Opening a savings account"], correct: 1 },
+        { q: "What is a stock market index like the S&P 500?", options: ["A single company's stock", "A basket that tracks many companies together", "A type of bank account", "A government tax"], correct: 1 },
+        { q: "If a stock's price goes up after you buy it, you have a...", options: ["Realized loss", "Unrealized gain", "Dividend", "Margin call"], correct: 1 },
+        { q: "What is diversification?", options: ["Putting all your money in one stock", "Spreading investments across different assets", "Buying only ETFs", "Day trading frequently"], correct: 1 },
+        { q: "What is an ETF?", options: ["A single stock", "A fund that holds a basket of stocks/assets, tradable like a stock", "A type of savings bond", "A crypto coin"], correct: 1 },
+        { q: "What does 'volume' refer to for a stock?", options: ["The number of shares traded in a period", "The company's total profit", "The stock's price", "The number of employees"], correct: 0 },
+        { q: "What is a dividend?", options: ["A fee charged by brokers", "A portion of company profit paid to shareholders", "A type of stock split", "A government tax on shares"], correct: 1 },
+        { q: "Why might someone hold cash instead of investing all of it?", options: ["Cash always earns more than stocks", "For safety, emergencies, and flexibility", "It's required by law", "Stocks can't be sold quickly"], correct: 1 },
+        { q: "What generally happens to a stock's price when a company reports much higher profit than expected?", options: ["It usually stays exactly flat", "It often tends to rise", "It always crashes", "Nothing, price only depends on volume"], correct: 1 },
+        { q: "What is 'risk' in investing?", options: ["The guarantee of losing money", "The chance that an investment's value could go down", "A fee charged by the stock exchange", "The interest rate on a savings account"], correct: 1 },
+      ],
+      [
+        { q: "What is a 'ticker symbol'?", options: ["A company's phone number", "The short code used to identify a stock (e.g. AAPL)", "A type of bond", "A trading fee"], correct: 1 },
+        { q: "What does it mean if a stock 'goes public' (IPO)?", options: ["It's delisted from the market", "It sells shares to the public for the first time", "It stops trading forever", "It merges with another company"], correct: 1 },
+        { q: "What is a brokerage account used for?", options: ["Storing cash only, like a bank", "Buying and selling investments like stocks and ETFs", "Paying taxes directly", "Getting a loan"], correct: 1 },
+        { q: "What's the difference between a stock and a bond, broadly?", options: ["A stock is ownership; a bond is a loan to a company/government", "They are exactly the same thing", "Bonds are riskier than stocks", "Stocks always pay fixed interest"], correct: 0 },
+        { q: "What does 'market cap' roughly represent?", options: ["The company's annual profit", "The total value of all a company's outstanding shares", "The number of employees", "The stock's daily trading volume"], correct: 1 },
+        { q: "Why is it generally risky to invest money you'll need very soon (e.g. next month's rent)?", options: ["It isn't risky at all", "Stock prices can drop in the short term, right when you need the cash", "Stocks are illegal to sell quickly", "Short-term investing is always profitable"], correct: 1 },
+        { q: "What is compound growth?", options: ["Earning returns only on your original investment", "Earning returns on both your original investment and past returns", "A type of stock split", "A one-time bonus payment"], correct: 1 },
+        { q: "What does 'long-term investing' generally mean?", options: ["Holding investments for years, riding out short-term ups and downs", "Selling within a few hours", "Only buying penny stocks", "Avoiding the stock market entirely"], correct: 0 },
+        { q: "What is a 'bear market'?", options: ["A period of generally rising prices", "A period of generally falling prices", "A market that's closed", "A market for bonds only"], correct: 1 },
+        { q: "Why do many beginners start with broad index ETFs (like VOO or QQQ)?", options: ["They guarantee profits", "They spread risk across many companies at once, in one purchase", "They're the only legal option", "They never lose value"], correct: 1 },
+      ],
     ],
   },
   intermediate: {
     label: "Intermediate",
     desc: "For those comfortable with the basics.",
-    questions: [
-      { q: "What does the P/E ratio compare?", options: ["Price to Earnings", "Profit to Expenses", "Price to Equity only", "Earnings to Employees"], correct: 0 },
-      { q: "A high Beta (e.g. 1.5) means a stock is generally...", options: ["Less volatile than the market", "More volatile than the market", "Guaranteed to outperform", "Immune to market crashes"], correct: 1 },
-      { q: "What is market capitalization?", options: ["Share price × total shares outstanding", "Total company debt", "Annual revenue", "The company's cash balance"], correct: 0 },
-      { q: "What does EPS stand for?", options: ["Equity Per Share", "Earnings Per Share", "Expense Per Sale", "Estimated Profit Summary"], correct: 1 },
-      { q: "What is a bull market?", options: ["A period of falling prices", "A period of generally rising prices", "A market with no trading", "A market for bonds only"], correct: 1 },
-      { q: "What is dollar-cost averaging?", options: ["Investing a lump sum all at once", "Investing a fixed amount at regular intervals regardless of price", "Only buying when prices fall", "Averaging two currencies"], correct: 1 },
-      { q: "What does a stock split (e.g. 2-for-1) do to share price and share count?", options: ["Price doubles, shares stay the same", "Price is halved, share count doubles", "Nothing changes", "Company value doubles"], correct: 1 },
-      { q: "What is a sector ETF (e.g. XLK)?", options: ["An ETF tracking a single stock", "An ETF focused on companies within one industry", "A bond fund", "A currency fund"], correct: 1 },
-      { q: "If a company's 52-week high is much higher than its current price, that could suggest...", options: ["The stock has definitely failed permanently", "The stock has pulled back from its yearly peak", "The company has no revenue", "The stock split recently"], correct: 1 },
-      { q: "What's a key risk of investing only in one sector?", options: ["No risk, sectors are always safe", "Concentration risk — a downturn in that sector hits your whole portfolio", "You'll automatically lose money", "It's not possible to do this"], correct: 1 },
+    questionSets: [
+      [
+        { q: "What does the P/E ratio compare?", options: ["Price to Earnings", "Profit to Expenses", "Price to Equity only", "Earnings to Employees"], correct: 0 },
+        { q: "A high Beta (e.g. 1.5) means a stock is generally...", options: ["Less volatile than the market", "More volatile than the market", "Guaranteed to outperform", "Immune to market crashes"], correct: 1 },
+        { q: "What is market capitalization?", options: ["Share price × total shares outstanding", "Total company debt", "Annual revenue", "The company's cash balance"], correct: 0 },
+        { q: "What does EPS stand for?", options: ["Equity Per Share", "Earnings Per Share", "Expense Per Sale", "Estimated Profit Summary"], correct: 1 },
+        { q: "What is a bull market?", options: ["A period of falling prices", "A period of generally rising prices", "A market with no trading", "A market for bonds only"], correct: 1 },
+        { q: "What is dollar-cost averaging?", options: ["Investing a lump sum all at once", "Investing a fixed amount at regular intervals regardless of price", "Only buying when prices fall", "Averaging two currencies"], correct: 1 },
+        { q: "What does a stock split (e.g. 2-for-1) do to share price and share count?", options: ["Price doubles, shares stay the same", "Price is halved, share count doubles", "Nothing changes", "Company value doubles"], correct: 1 },
+        { q: "What is a sector ETF (e.g. XLK)?", options: ["An ETF tracking a single stock", "An ETF focused on companies within one industry", "A bond fund", "A currency fund"], correct: 1 },
+        { q: "If a company's 52-week high is much higher than its current price, that could suggest...", options: ["The stock has definitely failed permanently", "The stock has pulled back from its yearly peak", "The company has no revenue", "The stock split recently"], correct: 1 },
+        { q: "What's a key risk of investing only in one sector?", options: ["No risk, sectors are always safe", "Concentration risk — a downturn in that sector hits your whole portfolio", "You'll automatically lose money", "It's not possible to do this"], correct: 1 },
+      ],
+      [
+        { q: "What does 'dividend yield' measure?", options: ["Annual dividend as a percentage of share price", "Total company profit", "The number of dividends paid per year, regardless of amount", "Stock price growth rate"], correct: 0 },
+        { q: "What is 'debt-to-equity ratio' used to assess?", options: ["How much a company relies on debt vs shareholder funding", "A company's daily trading volume", "How many shares a company has issued", "The company's dividend history"], correct: 0 },
+        { q: "What does it mean when a stock trades 'ex-dividend'?", options: ["It will never pay dividends again", "Buyers from that date on won't receive the upcoming declared dividend", "The dividend just doubled", "The stock is being delisted"], correct: 1 },
+        { q: "What is a 'limit order'?", options: ["An order executed immediately at the current market price", "An order that only executes at a specified price or better", "A type of dividend", "A tax on trades"], correct: 1 },
+        { q: "What does 'return on equity' (ROE) broadly measure?", options: ["How efficiently a company generates profit from shareholders' equity", "The company's total debt", "The stock's trading volume", "The number of shares outstanding"], correct: 0 },
+        { q: "Why might an investor rebalance their portfolio periodically?", options: ["To keep their target mix of assets after some have grown faster than others", "It's required by law every year", "To guarantee higher returns", "To avoid ever paying taxes"], correct: 0 },
+        { q: "What does 'volatility' describe?", options: ["How much a stock's price swings over time", "A stock's dividend amount", "The company's total revenue", "The number of analysts covering a stock"], correct: 0 },
+        { q: "What is a 'blue-chip' stock generally considered to be?", options: ["A brand-new, unproven startup", "A large, well-established, financially stable company", "A penny stock under $1", "A stock that only trades once a year"], correct: 1 },
+        { q: "What's the main idea behind 'buy and hold' investing?", options: ["Frequently trading in and out based on daily news", "Holding quality investments for the long run rather than reacting to short-term noise", "Selling everything at the first sign of a dip", "Only holding cash"], correct: 1 },
+        { q: "What does a stock buyback (share repurchase) typically do to shares outstanding?", options: ["Increases them", "Decreases them", "Has no effect", "Converts them to bonds"], correct: 1 },
+      ],
     ],
   },
   advanced: {
     label: "Advanced",
     desc: "Test deeper investing knowledge.",
-    questions: [
-      { q: "What does a negative correlation between two assets suggest for a portfolio?", options: ["They always move together, increasing risk", "They tend to move in opposite directions, which can reduce overall volatility", "They are the same asset", "One of them is worthless"], correct: 1 },
-      { q: "What is 'market cap weighting' in an index like the S&P 500?", options: ["Every company has equal weight", "Larger companies by market cap make up a bigger share of the index", "Weighting is random", "Weighting is based on stock price alone"], correct: 1 },
-      { q: "What does a rising bond yield generally pressure growth/tech stocks toward?", options: ["Higher valuations, since future earnings become more valuable", "Lower valuations, since future earnings are discounted more heavily", "No effect at all", "Automatic bankruptcy"], correct: 1 },
-      { q: "What is 'shorting' a stock?", options: ["Buying and holding for a short time", "Borrowing shares to sell now, hoping to buy back cheaper later", "Buying only fractional shares", "A type of dividend reinvestment"], correct: 1 },
-      { q: "What does 'expense ratio' refer to for an ETF/fund?", options: ["The fund's daily trading volume", "The annual fee charged as a percentage of your investment", "The number of stocks in the fund", "The fund's dividend yield"], correct: 1 },
-      { q: "What is a common effect of unexpectedly high inflation data on markets?", options: ["Markets are always unaffected", "It can raise expectations of higher interest rates, often pressuring stock valuations", "It guarantees a bull market", "It only affects currency markets"], correct: 1 },
-      { q: "What does 'liquidity' refer to for a stock?", options: ["How easily it can be bought/sold without moving the price much", "The company's cash reserves only", "The stock's dividend amount", "How many employees the company has"], correct: 0 },
-      { q: "What's a key difference between growth and value investing styles?", options: ["Growth focuses on high expected future earnings growth; value looks for stocks priced below perceived worth", "They are the same strategy", "Value investing avoids all stocks", "Growth investing avoids risk entirely"], correct: 0 },
-      { q: "What does a yield curve inversion (short-term rates above long-term) often historically precede?", options: ["Guaranteed market crashes within a week", "Has often preceded economic slowdowns, though timing varies", "Nothing of note", "Immediate interest rate cuts to zero"], correct: 1 },
-      { q: "Why can concentrated single-stock positions carry more risk than diversified holdings, even for a 'great' company?", options: ["Great companies can never lose value", "Company-specific events (fraud, product failure, competition) can hurt one stock far more than a diversified basket", "Single stocks are always more liquid", "Diversification always underperforms"], correct: 1 },
+    questionSets: [
+      [
+        { q: "What does a negative correlation between two assets suggest for a portfolio?", options: ["They always move together, increasing risk", "They tend to move in opposite directions, which can reduce overall volatility", "They are the same asset", "One of them is worthless"], correct: 1 },
+        { q: "What is 'market cap weighting' in an index like the S&P 500?", options: ["Every company has equal weight", "Larger companies by market cap make up a bigger share of the index", "Weighting is random", "Weighting is based on stock price alone"], correct: 1 },
+        { q: "What does a rising bond yield generally pressure growth/tech stocks toward?", options: ["Higher valuations, since future earnings become more valuable", "Lower valuations, since future earnings are discounted more heavily", "No effect at all", "Automatic bankruptcy"], correct: 1 },
+        { q: "What is 'shorting' a stock?", options: ["Buying and holding for a short time", "Borrowing shares to sell now, hoping to buy back cheaper later", "Buying only fractional shares", "A type of dividend reinvestment"], correct: 1 },
+        { q: "What does 'expense ratio' refer to for an ETF/fund?", options: ["The fund's daily trading volume", "The annual fee charged as a percentage of your investment", "The number of stocks in the fund", "The fund's dividend yield"], correct: 1 },
+        { q: "What is a common effect of unexpectedly high inflation data on markets?", options: ["Markets are always unaffected", "It can raise expectations of higher interest rates, often pressuring stock valuations", "It guarantees a bull market", "It only affects currency markets"], correct: 1 },
+        { q: "What does 'liquidity' refer to for a stock?", options: ["How easily it can be bought/sold without moving the price much", "The company's cash reserves only", "The stock's dividend amount", "How many employees the company has"], correct: 0 },
+        { q: "What's a key difference between growth and value investing styles?", options: ["Growth focuses on high expected future earnings growth; value looks for stocks priced below perceived worth", "They are the same strategy", "Value investing avoids all stocks", "Growth investing avoids risk entirely"], correct: 0 },
+        { q: "What does a yield curve inversion (short-term rates above long-term) often historically precede?", options: ["Guaranteed market crashes within a week", "Has often preceded economic slowdowns, though timing varies", "Nothing of note", "Immediate interest rate cuts to zero"], correct: 1 },
+        { q: "Why can concentrated single-stock positions carry more risk than diversified holdings, even for a 'great' company?", options: ["Great companies can never lose value", "Company-specific events (fraud, product failure, competition) can hurt one stock far more than a diversified basket", "Single stocks are always more liquid", "Diversification always underperforms"], correct: 1 },
+      ],
+      [
+        { q: "What does 'alpha' represent in portfolio performance?", options: ["Total portfolio value", "Excess return relative to a benchmark, after adjusting for risk", "A stock's beta", "The number of holdings"], correct: 1 },
+        { q: "What is 'sector rotation'?", options: ["Randomly swapping brokers", "Shifting investments between sectors based on the economic cycle", "A type of stock split", "Delisting a stock from an exchange"], correct: 1 },
+        { q: "Why might a company with strong earnings still see its stock price fall after reporting?", options: ["This never happens", "Results can miss elevated market expectations, or guidance disappoints", "Earnings reports never affect price", "It's a pricing error every time"], correct: 1 },
+        { q: "What does 'diworsification' refer to?", options: ["Ideal diversification", "Over-diversifying to the point where it dilutes returns without meaningfully reducing risk", "Investing in only one stock", "A tax strategy"], correct: 1 },
+        { q: "What is 'quantitative easing' broadly intended to do?", options: ["Raise interest rates sharply", "Increase money supply/liquidity to stimulate the economy", "Shrink the stock market", "Eliminate all government debt"], correct: 1 },
+        { q: "What does a 'moat' mean in company analysis?", options: ["A company's physical office perimeter", "A durable competitive advantage that protects profits from competitors", "A type of bond", "A trading fee"], correct: 1 },
+        { q: "How does duration risk generally relate to bonds?", options: ["Longer-duration bonds are typically more sensitive to interest rate changes", "Duration has no effect on bond prices", "Shorter-duration bonds are always riskier", "Duration only matters for stocks"], correct: 0 },
+        { q: "What is 'survivorship bias' in the context of historical index/stock performance?", options: ["Considering only currently-listed companies, ignoring those that failed or were delisted, which can overstate past returns", "A bias toward small-cap stocks", "A tax rule for surviving heirs", "A type of stock order"], correct: 0 },
+        { q: "What does 'free cash flow' roughly measure?", options: ["Cash a company generates after operating expenses and capital expenditures", "Total revenue before any costs", "The company's stock price", "Dividends paid to shareholders only"], correct: 0 },
+        { q: "Why can high-frequency news reactions be misleading for long-term investors?", options: ["News never affects prices", "Short-term price moves often reflect sentiment/noise rather than a company's underlying long-term value", "Reacting quickly always beats holding", "It guarantees better timing"], correct: 1 },
+      ],
     ],
   },
 };
@@ -626,9 +669,7 @@ function FormattedText({ text }) {
 function QuizSection() {
   const [difficulty, setDifficulty] = useState(null); // null = showing menu
   const [activeQuestions, setActiveQuestions] = useState(null); // resolved question list in use
-  const [quizSource, setQuizSource] = useState("static"); // "static" | "ai"
-  const [aiLoading, setAiLoading] = useState(false);
-  const [aiError, setAiError] = useState("");
+  const [loadingDiff, setLoadingDiff] = useState(null); // which difficulty is currently loading
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState([]); // [{selected, correct}]
   const [selected, setSelected] = useState(null);
@@ -642,21 +683,16 @@ function QuizSection() {
     }
   }
 
-  function startQuiz(diff) {
-    setDifficulty(diff);
-    setActiveQuestions(quizData[diff].questions);
-    setQuizSource("static");
-    setAiError("");
-    setStep(0);
-    setAnswers([]);
-    setSelected(null);
-    setShowResults(false);
+  function pickStaticSet(diff) {
+    const sets = quizData[diff].questionSets;
+    return sets[Math.floor(Math.random() * sets.length)];
   }
 
-  async function startAiQuiz(diff) {
-    setDifficulty(diff);
-    setAiLoading(true);
-    setAiError("");
+  // Single entry point: try to generate a fresh AI quiz, and if that fails
+  // or takes too long, fall back to a random static question set — quietly,
+  // with no "AI generated" labeling either way.
+  async function startQuiz(diff) {
+    setLoadingDiff(diff);
     setStep(0);
     setAnswers([]);
     setSelected(null);
@@ -671,18 +707,15 @@ function QuizSection() {
       const data = await response.json();
 
       if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
-        throw new Error(data.error || "Could not generate AI questions");
+        throw new Error(data.error || "Could not generate quiz");
       }
 
       setActiveQuestions(data.questions);
-      setQuizSource("ai");
     } catch (err) {
-      // Fall back to the static bank so the feature never dead-ends
-      setActiveQuestions(quizData[diff].questions);
-      setQuizSource("static");
-      setAiError("Couldn't generate a fresh AI quiz right now, so here's the standard one instead.");
+      setActiveQuestions(pickStaticSet(diff));
     } finally {
-      setAiLoading(false);
+      setDifficulty(diff);
+      setLoadingDiff(null);
     }
   }
 
@@ -700,15 +733,11 @@ function QuizSection() {
 
     if (step + 1 >= questions.length) {
       const score = newAnswers.filter((a) => a.correct).length;
-      // Only static-bank scores count toward the saved "best" — AI questions
-      // vary each time, so they wouldn't be a fair apples-to-apples comparison.
-      if (quizSource === "static") {
-        try {
-          const prevBest = Number(localStorage.getItem(`quizBest_${difficulty}`) || 0);
-          if (score > prevBest) localStorage.setItem(`quizBest_${difficulty}`, String(score));
-        } catch {
-          // localStorage unavailable — skip persisting best score
-        }
+      try {
+        const prevBest = Number(localStorage.getItem(`quizBest_${difficulty}`) || 0);
+        if (score > prevBest) localStorage.setItem(`quizBest_${difficulty}`, String(score));
+      } catch {
+        // localStorage unavailable — skip persisting best score
       }
       setShowResults(true);
     } else {
@@ -731,8 +760,9 @@ function QuizSection() {
             <p>{d.desc}</p>
             <div className="quizDiffBest">Best score: {bestScore(key) ?? "—"}/10</div>
             <div className="quizDiffActions">
-              <button className="quizStartBtn" onClick={() => startQuiz(key)}>Start quiz</button>
-              <button className="quizAiBtn" onClick={() => startAiQuiz(key)}>✨ New AI quiz</button>
+              <button className="quizStartBtn" onClick={() => startQuiz(key)} disabled={loadingDiff === key}>
+                {loadingDiff === key ? "Loading..." : "Start quiz"}
+              </button>
             </div>
           </div>
         ))}
@@ -740,21 +770,8 @@ function QuizSection() {
     );
   }
 
-  // ── AI generating ────────────────────────────────────────────────────
-  if (aiLoading) {
-    return (
-      <div className="quizCard">
-        <div className="quizProgress">{quizData[difficulty].label}</div>
-        <p>Generating a fresh set of questions with AI...</p>
-        <div className="quizActionsRow">
-          <button className="quizBackBtn" onClick={backToMenu}>Cancel</button>
-        </div>
-      </div>
-    );
-  }
-
+  if (!activeQuestions) return null;
   const questions = activeQuestions;
-  if (!questions) return null;
 
   // ── Results ───────────────────────────────────────────────────────────
   if (showResults) {
@@ -762,7 +779,6 @@ function QuizSection() {
     return (
       <div className="quizCard">
         <h3>{quizData[difficulty].label} quiz — complete!</h3>
-        {quizSource === "ai" && <div className="quizAiTag">✨ AI-generated questions</div>}
         <div className="quizResultsScore">{score} / {questions.length}</div>
         <p>
           {score === questions.length
@@ -787,9 +803,7 @@ function QuizSection() {
         ))}
 
         <div className="quizActionsRow">
-          <button className="quizRetakeBtn" onClick={() => (quizSource === "ai" ? startAiQuiz(difficulty) : startQuiz(difficulty))}>
-            {quizSource === "ai" ? "Generate another AI quiz" : "Retake quiz"}
-          </button>
+          <button className="quizRetakeBtn" onClick={() => startQuiz(difficulty)}>Retake quiz</button>
           <button className="quizBackBtn" onClick={backToMenu}>Back to quizzes</button>
         </div>
       </div>
@@ -803,9 +817,7 @@ function QuizSection() {
     <div className="quizCard">
       <div className="quizProgress">
         {quizData[difficulty].label} · Question {step + 1} of {questions.length}
-        {quizSource === "ai" && <span className="quizAiTag">✨ AI-generated</span>}
       </div>
-      {aiError && <p className="quizAiError">{aiError}</p>}
       <div className="quizQuestion">{question.q}</div>
       <div className="quizOptions">
         {question.options.map((opt, i) => {
@@ -1178,12 +1190,12 @@ function App() {
   ]);
 
   // ── AI Assistant chat state ─────────────────────────────────────────────
-  const [aiChatMessages, setAiChatMessages] = useState([
-    {
-      role: "assistant",
-      text: "Hi! I'm the StockSense AI Assistant. Ask me anything about investing, the stock market, or how a metric works — I'll keep it beginner-friendly. This is educational only, not financial advice."
-    }
-  ]);
+  const AI_CHAT_WELCOME = {
+    role: "assistant",
+    text: "Hi! I'm the StockSense AI Assistant. Ask me anything about investing, the stock market, or how a metric works — I'll keep it beginner-friendly. This is educational only, not financial advice."
+  };
+  const AI_CHAT_MAX_MESSAGES = 30; // auto-trim so history/localStorage never grows unbounded
+  const [aiChatMessages, setAiChatMessages] = useState([AI_CHAT_WELCOME]);
   const [aiChatInput, setAiChatInput] = useState("");
   const [aiChatLoading, setAiChatLoading] = useState(false);
   const [aiChatLevel, setAiChatLevel] = useState("");
@@ -1193,6 +1205,10 @@ function App() {
     "How is an ETF different from a single stock?",
     "What's the difference between growth and value investing?",
   ];
+
+  function clearAiChat() {
+    setAiChatMessages([AI_CHAT_WELCOME]);
+  }
 
   // ── Leaderboard state ────────────────────────────────────────────────
   const [leaderboardOptIn, setLeaderboardOptIn] = useState(false);
@@ -1327,6 +1343,20 @@ const showRawTickerOption =
       });
   }, []);
 
+  // Daily market news for the dashboard "Market News" card.
+  const [marketNews, setMarketNews] = useState([]);
+  const [marketNewsLoading, setMarketNewsLoading] = useState(true);
+  useEffect(() => {
+    setMarketNewsLoading(true);
+    fetch(`${API}/market/news`)
+      .then((r) => r.json())
+      .then((data) => {
+        setMarketNews(Array.isArray(data) ? data : []);
+        setMarketNewsLoading(false);
+      })
+      .catch(() => setMarketNewsLoading(false));
+  }, []);
+
   // Fetch search index once on mount — used for autocomplete
   // Merges API results with local stocks so local data always works even if API is down
   useEffect(() => {
@@ -1402,6 +1432,26 @@ const showRawTickerOption =
       .then(r => r.json())
       .then(data => { setStockDetail(data); setStockLoading(false); })
       .catch(() => setStockLoading(false));
+  }, [selectedStock]);
+
+  // Fetch recent news for the selected stock (last 30 days)
+  const [stockNews, setStockNews] = useState([]);
+  const [stockNewsLoading, setStockNewsLoading] = useState(false);
+  useEffect(() => {
+    if (!selectedStock) return;
+    setStockNews([]);
+    setStockNewsLoading(true);
+    const to = new Date();
+    const from = new Date();
+    from.setDate(from.getDate() - 30);
+    const fmt = (d) => d.toISOString().slice(0, 10);
+    fetch(`${API}/news/${selectedStock.ticker}?from=${fmt(from)}&to=${fmt(to)}`)
+      .then(r => r.json())
+      .then(data => {
+        setStockNews(Array.isArray(data.articles) ? data.articles : []);
+        setStockNewsLoading(false);
+      })
+      .catch(() => setStockNewsLoading(false));
   }, [selectedStock]);
 
   // Fetch chart data when stock or timeframe changes
@@ -1629,11 +1679,15 @@ const showRawTickerOption =
     return () => unsub();
   }, [page]);
 
+  const [leaderboardJustToggled, setLeaderboardJustToggled] = useState(false);
+
   function toggleLeaderboardOptIn() {
     if (!authUser) return;
     const next = !leaderboardOptIn;
     setLeaderboardOptIn(next);
     setDoc(doc(db, "users", authUser.uid), { leaderboardOptIn: next }, { merge: true }).catch(() => {});
+    setLeaderboardJustToggled(true);
+    setTimeout(() => setLeaderboardJustToggled(false), 400);
   }
 
   // Live quotes for everything currently held — powers the Positions table.
@@ -1959,9 +2013,14 @@ const showRawTickerOption =
     const message = (text ?? aiChatInput).trim();
     if (!message || aiChatLoading) return;
 
-    const history = aiChatMessages.map((m) => ({ role: m.role, text: m.text }));
+    // Only send recent history to the backend — keeps requests small and
+    // avoids re-sending an ever-growing transcript.
+    const history = aiChatMessages.slice(-12).map((m) => ({ role: m.role, text: m.text }));
 
-    setAiChatMessages((prev) => [...prev, { role: "user", text: message }]);
+    const trim = (msgs) =>
+      msgs.length > AI_CHAT_MAX_MESSAGES ? [AI_CHAT_WELCOME, ...msgs.slice(-(AI_CHAT_MAX_MESSAGES - 1))] : msgs;
+
+    setAiChatMessages((prev) => trim([...prev, { role: "user", text: message }]));
     setAiChatInput("");
     setAiChatLoading(true);
 
@@ -1978,12 +2037,12 @@ const showRawTickerOption =
         throw new Error(data.error || "AI chat failed");
       }
 
-      setAiChatMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+      setAiChatMessages((prev) => trim([...prev, { role: "assistant", text: data.reply }]));
     } catch (error) {
-      setAiChatMessages((prev) => [
+      setAiChatMessages((prev) => trim([
         ...prev,
         { role: "assistant", text: `Sorry, I couldn't reply just now. ${error.message}` },
-      ]);
+      ]));
     } finally {
       setAiChatLoading(false);
     }
@@ -2253,6 +2312,23 @@ function skipMonths(monthsToSkip) {
                     <span className={s.change >= 0 ? "green" : "red"}>{s.change >= 0 ? "▲" : "▼"} {s.change}%</span>
                   </div>
                 ))}
+              </div>
+
+              {/* Market News card */}
+              <div className="card dashNewsCard">
+                <h3>📰 Market News</h3>
+                {marketNewsLoading ? (
+                  <p className="sim-muted">Loading news...</p>
+                ) : marketNews.length === 0 ? (
+                  <p className="sim-muted">No news available right now.</p>
+                ) : (
+                  marketNews.slice(0, 5).map((n, i) => (
+                    <a key={i} className="dashNewsItem" href={n.url} target="_blank" rel="noopener noreferrer">
+                      <span className="dashNewsHeadline">{n.headline}</span>
+                      <span className="dashNewsSource">{n.source}</span>
+                    </a>
+                  ))
+                )}
               </div>
 
               {/* Daily Insight card - rotating */}
@@ -2621,6 +2697,25 @@ function skipMonths(monthsToSkip) {
                   </div>
                   );
                 })}
+              </div>
+
+              <div className="card stockNewsCard">
+                <h3>📰 Recent News — {selectedStock.ticker}</h3>
+                {stockNewsLoading ? (
+                  <p className="sim-muted">Loading news...</p>
+                ) : stockNews.length === 0 ? (
+                  <p className="sim-muted">No recent news found for this stock.</p>
+                ) : (
+                  stockNews.slice(0, 6).map((n, i) => (
+                    <a key={i} className="stockNewsItem" href={n.url} target="_blank" rel="noopener noreferrer">
+                      <span className="stockNewsHeadline">{n.headline}</span>
+                      <span className="stockNewsMeta">
+                        {n.source}
+                        {n.date ? ` · ${new Date(n.date * 1000).toLocaleDateString()}` : ""}
+                      </span>
+                    </a>
+                  ))
+                )}
               </div>
             </div>
           </section>
@@ -3241,7 +3336,12 @@ function skipMonths(monthsToSkip) {
 
         {page === "ai" && (
           <section className="page aiChatPage">
-            <h1>AI Assistant</h1>
+            <div className="aiChatHeaderRow">
+              <h1>AI Assistant</h1>
+              {aiChatMessages.length > 1 && (
+                <button className="aiChatClearBtn" onClick={clearAiChat}>🗑 Clear chat</button>
+              )}
+            </div>
             <p className="aiChatIntro">
               Ask about investing concepts, key metrics, or how to use StockSense. Beginner-friendly, always.
             </p>
@@ -3251,7 +3351,7 @@ function skipMonths(monthsToSkip) {
               {["beginner", "intermediate", "advanced"].map((lvl) => (
                 <button
                   key={lvl}
-                  className={aiChatLevel === lvl ? "chipActive" : ""}
+                  className={`aiLevelChip ${aiChatLevel === lvl ? "chipActive" : ""}`}
                   onClick={() => setAiChatLevel(aiChatLevel === lvl ? "" : lvl)}
                 >
                   {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
@@ -3260,6 +3360,12 @@ function skipMonths(monthsToSkip) {
             </div>
 
             <div className="aiChatCard">
+              {aiChatMessages.length >= 20 && (
+                <div className="aiChatLongHint">
+                  <span>This chat is getting long — clearing it keeps things fast.</span>
+                  <button className="aiChatClearBtn" onClick={clearAiChat}>Clear now</button>
+                </div>
+              )}
               <div className="aiChatMessages">
                 {aiChatMessages.map((m, i) => (
                   <div key={i} className={`aiChatMessage ${m.role}`}>
@@ -3313,7 +3419,7 @@ function skipMonths(monthsToSkip) {
                   <p>Off by default. Turn this on to display your name and portfolio value publicly.</p>
                 </div>
                 <button
-                  className={`leaderboardToggle ${leaderboardOptIn ? "on" : "off"}`}
+                  className={`leaderboardToggle ${leaderboardOptIn ? "on" : "off"} ${leaderboardJustToggled ? "justToggled" : ""}`}
                   onClick={toggleLeaderboardOptIn}
                 >
                   {leaderboardOptIn ? "Visible ✓" : "Hidden"}
