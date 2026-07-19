@@ -145,6 +145,78 @@ def fetch_quote(ticker: str) -> dict:
     }
 
 
+def _finnhub_fundamentals(ticker: str) -> dict:
+    """
+    Last-resort fundamentals source for fetch_stock_detail(), used when
+    Yahoo's info/quote/quoteSummary endpoints are all blocked. Uses
+    Finnhub's basic-financials endpoint (same FINNHUB_API_KEY already used
+    by routes/news.py), which doesn't require the Yahoo auth crumb.
+    Returns a dict shaped like yfinance's `info`, normalised to the same
+    units/conventions fetch_stock_detail already expects from `info`:
+      - marketCap / averageVolume in raw units (Finnhub reports these in
+        millions, so we scale up)
+      - dividendYield as a fraction (Finnhub reports it as a %, so we
+        divide by 100 to match yfinance's convention)
+      - debtToEquity left as Finnhub's raw (percent-like) figure — the
+        existing >20 check in fetch_stock_detail already normalises that
+    """
+    import os
+
+    api_key = os.getenv("FINNHUB_API_KEY")
+    if not api_key:
+        raise ValueError("FINNHUB_API_KEY not set")
+
+    res = requests.get(
+        "https://finnhub.io/api/v1/stock/metric",
+        params={"symbol": ticker.upper(), "metric": "all", "token": api_key},
+        timeout=10,
+    )
+    res.raise_for_status()
+    m = (res.json() or {}).get("metric") or {}
+    if not m:
+        raise ValueError(f"No Finnhub metrics for {ticker}")
+
+    def _scale_millions(v):
+        return v * 1e6 if v is not None else None
+
+    market_cap = _scale_millions(m.get("marketCapitalization"))
+
+    avg_volume = m.get("3MonthAverageTradingVolume") or m.get("10DayAverageTradingVolume")
+    # Finnhub reports average volume in millions of shares too.
+    if avg_volume is not None and avg_volume < 100000:
+        avg_volume = avg_volume * 1e6
+
+    div_yield_raw = m.get("currentDividendYieldTTM")
+    div_yield = (div_yield_raw / 100) if div_yield_raw is not None else None
+
+    roe_raw = m.get("roeTTM")
+    roe = (roe_raw / 100) if roe_raw is not None else None
+
+    long_name = None
+    try:
+        prof = requests.get(
+            "https://finnhub.io/api/v1/stock/profile2",
+            params={"symbol": ticker.upper(), "token": api_key},
+            timeout=10,
+        )
+        if prof.ok:
+            long_name = (prof.json() or {}).get("name")
+    except Exception:
+        pass
+
+    return {
+        "trailingPE": m.get("peTTM") or m.get("peBasicExclExtraTTM") or m.get("peExclExtraTTM"),
+        "marketCap": market_cap,
+        "dividendYield": div_yield,
+        "trailingEps": m.get("epsTTM") or m.get("epsInclExtraItemsTTM") or m.get("epsExclExtraItemsTTM"),
+        "beta": m.get("beta"),
+        "debtToEquity": m.get("totalDebt/totalEquityQuarterly") or m.get("totalDebt/totalEquityAnnual"),
+        "returnOnEquity": roe,
+        "averageVolume": avg_volume,
+        "longName": long_name,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Full stock detail — all 9 metrics the Learn/Stock page displays
 # ---------------------------------------------------------------------------
@@ -185,27 +257,56 @@ def fetch_stock_detail(ticker: str) -> dict:
     except Exception:
         info = {}
 
+    # NOTE: we deliberately don't use dict.setdefault() here. setdefault()
+    # only fills in a key if it's completely absent — but yfinance's t.info
+    # commonly returns a full dict with the key PRESENT and set to None
+    # (e.g. when Yahoo withholds fundamentals on cloud-host IPs), so
+    # setdefault silently does nothing and every fallback tier below it was
+    # a no-op. This was the actual cause of PE / EPS / beta / div yield /
+    # debt-to-equity / ROE always showing N/A even though the fallback
+    # calls were "succeeding". Using "if not info.get(k): info[k] = v"
+    # instead correctly overwrites both missing AND None values.
     if not info.get("trailingPE") or not info.get("marketCap"):
         try:
             q = _yahoo_quote(ticker)
-            info.setdefault("trailingPE", q.get("trailingPE"))
-            info.setdefault("marketCap", q.get("marketCap"))
-            info.setdefault("trailingEps", q.get("epsTrailingTwelveMonths"))
-            info.setdefault("averageVolume", q.get("averageDailyVolume3Month"))
-            info.setdefault("longName", q.get("longName") or q.get("shortName"))
+            candidates = {
+                "trailingPE": q.get("trailingPE"),
+                "marketCap": q.get("marketCap"),
+                "trailingEps": q.get("epsTrailingTwelveMonths"),
+                "averageVolume": q.get("averageDailyVolume3Month"),
+                "longName": q.get("longName") or q.get("shortName"),
+            }
+            for k, v in candidates.items():
+                if v is not None and not info.get(k):
+                    info[k] = v
         except Exception:
             pass
 
     # Third-tier fallback: dividendYield / beta / debtToEquity / returnOnEquity
     # aren't covered by the lightweight quote endpoint above, so if they're
     # still missing (t.info blocked entirely), hit quoteSummary directly.
-    needed = ("dividendYield", "beta", "debtToEquity", "returnOnEquity", "trailingPE", "marketCap", "trailingEps")
+    needed = ("dividendYield", "beta", "debtToEquity", "returnOnEquity", "trailingPE", "marketCap", "trailingEps", "averageVolume")
     if any(not info.get(k) for k in needed):
         try:
             qs = _yahoo_quote_summary(ticker)
             for k, v in qs.items():
-                if v is not None:
-                    info.setdefault(k, v)
+                if v is not None and not info.get(k):
+                    info[k] = v
+        except Exception:
+            pass
+
+    # Fourth-tier fallback: Yahoo's raw quote/quoteSummary endpoints above
+    # require an auth crumb Yahoo doesn't hand out to plain unauthenticated
+    # requests from most cloud hosts, so tiers 2 and 3 frequently fail
+    # entirely too. Finnhub (we already hold a key for news) has a stable,
+    # keyed fundamentals endpoint that covers the same fields, so use it as
+    # a last resort for whatever is still missing.
+    if any(not info.get(k) for k in needed):
+        try:
+            fh = _finnhub_fundamentals(ticker)
+            for k, v in fh.items():
+                if v is not None and not info.get(k):
+                    info[k] = v
         except Exception:
             pass
 
@@ -526,10 +627,37 @@ def fetch_indices() -> list:
 # Daily market news — general financial headlines for the dashboard
 # ---------------------------------------------------------------------------
 
+# Keywords used to decide whether a general-news headline is actually
+# market/finance-relevant. Covers direct market terms (stocks, Fed, earnings)
+# as well as the macro/geopolitical terms that typically move markets
+# (tariffs, sanctions, oil, OPEC) — so a story about a geopolitical event
+# only surfaces here when it's tied to something like sanctions or oil
+# prices, not just any world-news headline.
+FINANCIAL_KEYWORDS = [
+    "stock", "stocks", "market", "markets", "nasdaq", "dow jones", "s&p",
+    "wall street", "fed", "federal reserve", "interest rate", "rate cut",
+    "rate hike", "inflation", "gdp", "earnings", "ipo", "merger",
+    "acquisition", "tariff", "trade war", "oil price", "crude", "opec",
+    "treasury", "bond", "yield", "recession", "economy", "economic",
+    "central bank", "dollar", "currency", "crypto", "bitcoin",
+    "jobs report", "unemployment", "cpi", "sanctions", "supply chain",
+    "commodity", "commodities", "investor", "investors", "shares",
+    "hedge fund", "layoffs", "export", "import", "antitrust",
+]
+
+
+def _is_financially_relevant(headline: str, summary: str) -> bool:
+    text = f"{headline or ''} {summary or ''}".lower()
+    return any(kw in text for kw in FINANCIAL_KEYWORDS)
+
+
 def fetch_market_news(limit: int = 8) -> list:
     """
     General market/finance headlines (not tied to a specific ticker), for
-    the dashboard "Market News" card. Uses Finnhub's general-news endpoint.
+    the dashboard "Market News" card. Uses Finnhub's general-news endpoint,
+    then filters down to stories with a clear financial/market angle —
+    Finnhub's raw "general" category otherwise mixes in a lot of non-market
+    world news, which made the card feel unfocused.
     """
     import os
 
@@ -545,8 +673,25 @@ def fetch_market_news(limit: int = 8) -> list:
     res.raise_for_status()
     raw = res.json()
 
+    filtered = [
+        item for item in raw
+        if _is_financially_relevant(item.get("headline", ""), item.get("summary", ""))
+    ]
+
+    # If the financial filter leaves us short of `limit`, top up with the
+    # next unfiltered stories (already newest-first from Finnhub) rather
+    # than showing a sparse or empty card.
+    if len(filtered) < limit:
+        seen_ids = {item.get("id") for item in filtered}
+        for item in raw:
+            if item.get("id") not in seen_ids:
+                filtered.append(item)
+                seen_ids.add(item.get("id"))
+            if len(filtered) >= limit:
+                break
+
     articles = []
-    for item in raw[:limit]:
+    for item in filtered[:limit]:
         articles.append({
             "headline": item.get("headline"),
             "source": item.get("source"),

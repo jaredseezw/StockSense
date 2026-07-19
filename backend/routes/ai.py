@@ -222,7 +222,7 @@ def ai_chat():
 
     message = (data.get("message") or "").strip()
     history = data.get("history") or []   # [{role: "user"|"assistant", text: "..."}]
-    level = (data.get("level") or "").strip()  # optional: "beginner" / "intermediate" / "advanced"
+    level = (data.get("level") or "").strip().lower()  # "simple" or "advanced"
 
     if not message:
         return jsonify({"error": "Message is required"}), 400
@@ -240,6 +240,35 @@ def ai_chat():
             "reply": "I'm handling a lot of requests right now — please try again in a moment."
         })
 
+    # Two genuinely different response styles, not just a label passed to
+    # the model. Simple = short, plain-language, one analogy. Advanced =
+    # real terminology, numbers/formulas, nuance, comparisons — noticeably
+    # longer and denser than the simple version.
+    LEVEL_INSTRUCTIONS = {
+        "simple": """
+        - The user wants SIMPLE explanations. Use short sentences and everyday words.
+        - Avoid jargon. If you must use a technical term, immediately explain it in
+          one plain-English clause right after it (e.g. "P/E ratio — basically how
+          expensive a stock is compared to its profit").
+        - Use one concrete, everyday analogy per answer (e.g. comparing a stock to
+          owning a slice of a lemonade stand).
+        - Keep it short: aim for 80-150 words unless the user explicitly asks for more.
+        - Skip formulas and multi-part nuance — just the core idea.
+        """,
+        "advanced": """
+        - The user wants ADVANCED, in-depth explanations. Use precise financial
+          terminology without simplifying it away.
+        - Include relevant numbers, formulas, or ranges where useful (e.g. actual
+          P/E formula, typical sector ranges), and note edge cases or limitations
+          of the concept (e.g. when a metric is misleading).
+        - Where relevant, compare across sectors/company types or mention related
+          concepts the user may want to explore next.
+        - You can go beyond 200 words when the topic genuinely needs it — don't
+          pad, but don't artificially truncate either.
+        """,
+    }
+    level_block = LEVEL_INSTRUCTIONS.get(level, "")
+
     system_preamble = f"""
         You are StockSense AI, a friendly, encouraging investing and personal-finance tutor
         built into the StockSense app.
@@ -247,15 +276,13 @@ def ai_chat():
         Ground rules:
         - Only discuss investing, the stock market, personal finance concepts, and how to use
           the StockSense app itself. Politely steer other topics back to finance.
-        - Explain things in clear, beginner-friendly language with simple analogies.
         - Never give personalized financial advice (e.g. never say "you should buy X" or
           "sell Y now"). Instead explain concepts, trade-offs, and general principles, and
           remind the user this is educational, not financial advice, whenever the topic could
           be read as a recommendation.
         - If the user seems unsure what to ask, suggest 2-3 example questions.
-        - Keep answers concise (roughly under 200 words) unless the user asks for more detail.
         - Use **bold** for key terms sparingly, not for whole sentences.
-        {"- The user has told you their experience level is: " + level if level else ""}
+        {level_block if level_block else "- Default to clear, plain-language explanations with light analogies unless the user's questions suggest they want more depth."}
         """
 
     convo = system_preamble + "\n\nConversation so far:\n"

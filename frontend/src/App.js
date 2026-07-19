@@ -3348,7 +3348,7 @@ function skipMonths(monthsToSkip) {
 
             <div className="aiChatLevelRow">
               <span>Your level:</span>
-              {["beginner", "intermediate", "advanced"].map((lvl) => (
+              {["simple", "advanced"].map((lvl) => (
                 <button
                   key={lvl}
                   className={`aiLevelChip ${aiChatLevel === lvl ? "chipActive" : ""}`}
