@@ -12,6 +12,7 @@ import {
 import {
   doc,
   setDoc,
+  deleteDoc,
   collection,
   onSnapshot,
   runTransaction,
@@ -543,6 +544,300 @@ const basicsData = [
   },
 ];
 
+// Static quiz bank — 3 difficulty levels, MCQ, scored out of 10.
+const quizData = {
+  basic: {
+    label: "Basic",
+    desc: "Start here if you're new to investing.",
+    questions: [
+      { q: "What does it mean to 'buy a stock'?", options: ["Lending money to a bank", "Buying a small ownership share in a company", "Buying a government bond", "Opening a savings account"], correct: 1 },
+      { q: "What is a stock market index like the S&P 500?", options: ["A single company's stock", "A basket that tracks many companies together", "A type of bank account", "A government tax"], correct: 1 },
+      { q: "If a stock's price goes up after you buy it, you have a...", options: ["Realized loss", "Unrealized gain", "Dividend", "Margin call"], correct: 1 },
+      { q: "What is diversification?", options: ["Putting all your money in one stock", "Spreading investments across different assets", "Buying only ETFs", "Day trading frequently"], correct: 1 },
+      { q: "What is an ETF?", options: ["A single stock", "A fund that holds a basket of stocks/assets, tradable like a stock", "A type of savings bond", "A crypto coin"], correct: 1 },
+      { q: "What does 'volume' refer to for a stock?", options: ["The number of shares traded in a period", "The company's total profit", "The stock's price", "The number of employees"], correct: 0 },
+      { q: "What is a dividend?", options: ["A fee charged by brokers", "A portion of company profit paid to shareholders", "A type of stock split", "A government tax on shares"], correct: 1 },
+      { q: "Why might someone hold cash instead of investing all of it?", options: ["Cash always earns more than stocks", "For safety, emergencies, and flexibility", "It's required by law", "Stocks can't be sold quickly"], correct: 1 },
+      { q: "What generally happens to a stock's price when a company reports much higher profit than expected?", options: ["It usually stays exactly flat", "It often tends to rise", "It always crashes", "Nothing, price only depends on volume"], correct: 1 },
+      { q: "What is 'risk' in investing?", options: ["The guarantee of losing money", "The chance that an investment's value could go down", "A fee charged by the stock exchange", "The interest rate on a savings account"], correct: 1 },
+    ],
+  },
+  intermediate: {
+    label: "Intermediate",
+    desc: "For those comfortable with the basics.",
+    questions: [
+      { q: "What does the P/E ratio compare?", options: ["Price to Earnings", "Profit to Expenses", "Price to Equity only", "Earnings to Employees"], correct: 0 },
+      { q: "A high Beta (e.g. 1.5) means a stock is generally...", options: ["Less volatile than the market", "More volatile than the market", "Guaranteed to outperform", "Immune to market crashes"], correct: 1 },
+      { q: "What is market capitalization?", options: ["Share price × total shares outstanding", "Total company debt", "Annual revenue", "The company's cash balance"], correct: 0 },
+      { q: "What does EPS stand for?", options: ["Equity Per Share", "Earnings Per Share", "Expense Per Sale", "Estimated Profit Summary"], correct: 1 },
+      { q: "What is a bull market?", options: ["A period of falling prices", "A period of generally rising prices", "A market with no trading", "A market for bonds only"], correct: 1 },
+      { q: "What is dollar-cost averaging?", options: ["Investing a lump sum all at once", "Investing a fixed amount at regular intervals regardless of price", "Only buying when prices fall", "Averaging two currencies"], correct: 1 },
+      { q: "What does a stock split (e.g. 2-for-1) do to share price and share count?", options: ["Price doubles, shares stay the same", "Price is halved, share count doubles", "Nothing changes", "Company value doubles"], correct: 1 },
+      { q: "What is a sector ETF (e.g. XLK)?", options: ["An ETF tracking a single stock", "An ETF focused on companies within one industry", "A bond fund", "A currency fund"], correct: 1 },
+      { q: "If a company's 52-week high is much higher than its current price, that could suggest...", options: ["The stock has definitely failed permanently", "The stock has pulled back from its yearly peak", "The company has no revenue", "The stock split recently"], correct: 1 },
+      { q: "What's a key risk of investing only in one sector?", options: ["No risk, sectors are always safe", "Concentration risk — a downturn in that sector hits your whole portfolio", "You'll automatically lose money", "It's not possible to do this"], correct: 1 },
+    ],
+  },
+  advanced: {
+    label: "Advanced",
+    desc: "Test deeper investing knowledge.",
+    questions: [
+      { q: "What does a negative correlation between two assets suggest for a portfolio?", options: ["They always move together, increasing risk", "They tend to move in opposite directions, which can reduce overall volatility", "They are the same asset", "One of them is worthless"], correct: 1 },
+      { q: "What is 'market cap weighting' in an index like the S&P 500?", options: ["Every company has equal weight", "Larger companies by market cap make up a bigger share of the index", "Weighting is random", "Weighting is based on stock price alone"], correct: 1 },
+      { q: "What does a rising bond yield generally pressure growth/tech stocks toward?", options: ["Higher valuations, since future earnings become more valuable", "Lower valuations, since future earnings are discounted more heavily", "No effect at all", "Automatic bankruptcy"], correct: 1 },
+      { q: "What is 'shorting' a stock?", options: ["Buying and holding for a short time", "Borrowing shares to sell now, hoping to buy back cheaper later", "Buying only fractional shares", "A type of dividend reinvestment"], correct: 1 },
+      { q: "What does 'expense ratio' refer to for an ETF/fund?", options: ["The fund's daily trading volume", "The annual fee charged as a percentage of your investment", "The number of stocks in the fund", "The fund's dividend yield"], correct: 1 },
+      { q: "What is a common effect of unexpectedly high inflation data on markets?", options: ["Markets are always unaffected", "It can raise expectations of higher interest rates, often pressuring stock valuations", "It guarantees a bull market", "It only affects currency markets"], correct: 1 },
+      { q: "What does 'liquidity' refer to for a stock?", options: ["How easily it can be bought/sold without moving the price much", "The company's cash reserves only", "The stock's dividend amount", "How many employees the company has"], correct: 0 },
+      { q: "What's a key difference between growth and value investing styles?", options: ["Growth focuses on high expected future earnings growth; value looks for stocks priced below perceived worth", "They are the same strategy", "Value investing avoids all stocks", "Growth investing avoids risk entirely"], correct: 0 },
+      { q: "What does a yield curve inversion (short-term rates above long-term) often historically precede?", options: ["Guaranteed market crashes within a week", "Has often preceded economic slowdowns, though timing varies", "Nothing of note", "Immediate interest rate cuts to zero"], correct: 1 },
+      { q: "Why can concentrated single-stock positions carry more risk than diversified holdings, even for a 'great' company?", options: ["Great companies can never lose value", "Company-specific events (fraud, product failure, competition) can hurt one stock far more than a diversified basket", "Single stocks are always more liquid", "Diversification always underperforms"], correct: 1 },
+    ],
+  },
+};
+
+// Renders simple AI-generated markdown (just **bold** + line breaks) as real
+// HTML instead of dumping raw asterisks on screen.
+function FormattedText({ text }) {
+  if (!text) return null;
+  const lines = String(text).split("\n").filter((l) => l.trim() !== "");
+  return (
+    <>
+      {lines.map((line, i) => {
+        const parts = line.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+        return (
+          <p key={i} className="aiTextLine">
+            {parts.map((part, j) =>
+              part.startsWith("**") && part.endsWith("**") ? (
+                <strong key={j}>{part.slice(2, -2)}</strong>
+              ) : (
+                <span key={j}>{part}</span>
+              )
+            )}
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
+// Static quiz flow: menu → in-progress → results. Tracks a per-difficulty
+// best score locally (localStorage) so users can retake and improve.
+function QuizSection() {
+  const [difficulty, setDifficulty] = useState(null); // null = showing menu
+  const [activeQuestions, setActiveQuestions] = useState(null); // resolved question list in use
+  const [quizSource, setQuizSource] = useState("static"); // "static" | "ai"
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState("");
+  const [step, setStep] = useState(0);
+  const [answers, setAnswers] = useState([]); // [{selected, correct}]
+  const [selected, setSelected] = useState(null);
+  const [showResults, setShowResults] = useState(false);
+
+  function bestScore(diff) {
+    try {
+      return localStorage.getItem(`quizBest_${diff}`);
+    } catch {
+      return null;
+    }
+  }
+
+  function startQuiz(diff) {
+    setDifficulty(diff);
+    setActiveQuestions(quizData[diff].questions);
+    setQuizSource("static");
+    setAiError("");
+    setStep(0);
+    setAnswers([]);
+    setSelected(null);
+    setShowResults(false);
+  }
+
+  async function startAiQuiz(diff) {
+    setDifficulty(diff);
+    setAiLoading(true);
+    setAiError("");
+    setStep(0);
+    setAnswers([]);
+    setSelected(null);
+    setShowResults(false);
+
+    try {
+      const response = await fetch(`${API}/ai/quiz-generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ difficulty: diff }),
+      });
+      const data = await response.json();
+
+      if (!response.ok || !Array.isArray(data.questions) || data.questions.length === 0) {
+        throw new Error(data.error || "Could not generate AI questions");
+      }
+
+      setActiveQuestions(data.questions);
+      setQuizSource("ai");
+    } catch (err) {
+      // Fall back to the static bank so the feature never dead-ends
+      setActiveQuestions(quizData[diff].questions);
+      setQuizSource("static");
+      setAiError("Couldn't generate a fresh AI quiz right now, so here's the standard one instead.");
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  function pickAnswer(idx) {
+    if (selected !== null) return;
+    setSelected(idx);
+  }
+
+  function nextQuestion() {
+    const questions = activeQuestions;
+    const isCorrect = questions[step].correct === selected;
+    const newAnswers = [...answers, { selected, correct: isCorrect }];
+    setAnswers(newAnswers);
+    setSelected(null);
+
+    if (step + 1 >= questions.length) {
+      const score = newAnswers.filter((a) => a.correct).length;
+      // Only static-bank scores count toward the saved "best" — AI questions
+      // vary each time, so they wouldn't be a fair apples-to-apples comparison.
+      if (quizSource === "static") {
+        try {
+          const prevBest = Number(localStorage.getItem(`quizBest_${difficulty}`) || 0);
+          if (score > prevBest) localStorage.setItem(`quizBest_${difficulty}`, String(score));
+        } catch {
+          // localStorage unavailable — skip persisting best score
+        }
+      }
+      setShowResults(true);
+    } else {
+      setStep(step + 1);
+    }
+  }
+
+  function backToMenu() {
+    setDifficulty(null);
+    setActiveQuestions(null);
+  }
+
+  // ── Menu ──────────────────────────────────────────────────────────────
+  if (!difficulty) {
+    return (
+      <div className="quizMenuGrid">
+        {Object.entries(quizData).map(([key, d]) => (
+          <div className="quizDiffCard" key={key}>
+            <h3>{d.label}</h3>
+            <p>{d.desc}</p>
+            <div className="quizDiffBest">Best score: {bestScore(key) ?? "—"}/10</div>
+            <div className="quizDiffActions">
+              <button className="quizStartBtn" onClick={() => startQuiz(key)}>Start quiz</button>
+              <button className="quizAiBtn" onClick={() => startAiQuiz(key)}>✨ New AI quiz</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  // ── AI generating ────────────────────────────────────────────────────
+  if (aiLoading) {
+    return (
+      <div className="quizCard">
+        <div className="quizProgress">{quizData[difficulty].label}</div>
+        <p>Generating a fresh set of questions with AI...</p>
+        <div className="quizActionsRow">
+          <button className="quizBackBtn" onClick={backToMenu}>Cancel</button>
+        </div>
+      </div>
+    );
+  }
+
+  const questions = activeQuestions;
+  if (!questions) return null;
+
+  // ── Results ───────────────────────────────────────────────────────────
+  if (showResults) {
+    const score = answers.filter((a) => a.correct).length;
+    return (
+      <div className="quizCard">
+        <h3>{quizData[difficulty].label} quiz — complete!</h3>
+        {quizSource === "ai" && <div className="quizAiTag">✨ AI-generated questions</div>}
+        <div className="quizResultsScore">{score} / {questions.length}</div>
+        <p>
+          {score === questions.length
+            ? "Perfect score! 🎉"
+            : score >= questions.length * 0.7
+            ? "Nice work — you know this well."
+            : "Good effort — review the answers below to sharpen up."}
+        </p>
+
+        {answers.map((a, i) => (
+          <div className="quizReviewItem" key={i}>
+            <div className="quizReviewQ">{i + 1}. {questions[i].q}</div>
+            <div className={`quizReviewAns ${a.correct ? "right" : "wrong"}`}>
+              Your answer: {questions[i].options[a.selected] ?? "No answer"} {a.correct ? "✓" : "✗"}
+            </div>
+            {!a.correct && (
+              <div className="quizReviewAns right">
+                Correct answer: {questions[i].options[questions[i].correct]}
+              </div>
+            )}
+          </div>
+        ))}
+
+        <div className="quizActionsRow">
+          <button className="quizRetakeBtn" onClick={() => (quizSource === "ai" ? startAiQuiz(difficulty) : startQuiz(difficulty))}>
+            {quizSource === "ai" ? "Generate another AI quiz" : "Retake quiz"}
+          </button>
+          <button className="quizBackBtn" onClick={backToMenu}>Back to quizzes</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── In-progress question ────────────────────────────────────────────
+  const question = questions[step];
+
+  return (
+    <div className="quizCard">
+      <div className="quizProgress">
+        {quizData[difficulty].label} · Question {step + 1} of {questions.length}
+        {quizSource === "ai" && <span className="quizAiTag">✨ AI-generated</span>}
+      </div>
+      {aiError && <p className="quizAiError">{aiError}</p>}
+      <div className="quizQuestion">{question.q}</div>
+      <div className="quizOptions">
+        {question.options.map((opt, i) => {
+          let cls = "quizOption";
+          if (selected !== null) {
+            cls += " disabledOpt";
+            if (i === question.correct) cls += " correct";
+            else if (i === selected) cls += " incorrect";
+          }
+          return (
+            <button key={i} className={cls} onClick={() => pickAnswer(i)}>
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+
+      {selected !== null && (
+        <div className="quizNextRow">
+          <button className="quizNextBtn" onClick={nextQuestion}>
+            {step + 1 >= questions.length ? "See results" : "Next question"}
+          </button>
+        </div>
+      )}
+
+      <div className="quizActionsRow">
+        <button className="quizBackBtn" onClick={backToMenu}>Exit quiz</button>
+      </div>
+    </div>
+  );
+}
+
 function BasicsCard({ item, onNavigate }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -875,6 +1170,35 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // ── Market indices strip (live) ─────────────────────────────────────────
+  const [marketIndices, setMarketIndices] = useState([
+    { name: "S&P 500", value: "—", change: 0 },
+    { name: "NASDAQ", value: "—", change: 0 },
+    { name: "DOW JONES", value: "—", change: 0 },
+  ]);
+
+  // ── AI Assistant chat state ─────────────────────────────────────────────
+  const [aiChatMessages, setAiChatMessages] = useState([
+    {
+      role: "assistant",
+      text: "Hi! I'm the StockSense AI Assistant. Ask me anything about investing, the stock market, or how a metric works — I'll keep it beginner-friendly. This is educational only, not financial advice."
+    }
+  ]);
+  const [aiChatInput, setAiChatInput] = useState("");
+  const [aiChatLoading, setAiChatLoading] = useState(false);
+  const [aiChatLevel, setAiChatLevel] = useState("");
+  const aiChatSuggestions = [
+    "What's a P/E ratio in simple terms?",
+    "What does diversification mean?",
+    "How is an ETF different from a single stock?",
+    "What's the difference between growth and value investing?",
+  ];
+
+  // ── Leaderboard state ────────────────────────────────────────────────
+  const [leaderboardOptIn, setLeaderboardOptIn] = useState(false);
+  const [leaderboardRows, setLeaderboardRows] = useState([]);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(true);
+
   // ── Portfolio / Firestore state ─────────────────────────────────────────
   const [cash, setCash] = useState(null);            // null = not loaded yet
   const [positions, setPositions] = useState([]);     // [{ticker, shares, avgCost}]
@@ -987,6 +1311,21 @@ const showRawTickerOption =
     }, 8000);
     return () => clearInterval(timer);
   }, [dailyInsights.length]);
+
+  // Fetch live index prices (S&P 500, NASDAQ, DOW) once on mount.
+  // Backend already fetches these live via yfinance — just wire it up.
+  useEffect(() => {
+    fetch(`${API}/market/indices`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data) && data.length > 0) {
+          setMarketIndices(data);
+        }
+      })
+      .catch(() => {
+        // keep the "—" placeholders — better than showing stale hardcoded numbers
+      });
+  }, []);
 
   // Fetch search index once on mount — used for autocomplete
   // Merges API results with local stocks so local data always works even if API is down
@@ -1212,6 +1551,7 @@ const showRawTickerOption =
     const unsubUser = onSnapshot(userRef, (snap) => {
       if (snap.exists()) {
         setCash(snap.data().cash ?? 0);
+        setLeaderboardOptIn(snap.data().leaderboardOptIn ?? false);
       }
     });
 
@@ -1235,6 +1575,66 @@ const showRawTickerOption =
       unsubTx();
     };
   }, [authUser]);
+
+  // Total account value (cash + live holdings) — used to power the leaderboard.
+  const netWorth = useMemo(() => {
+    const holdingsValue = positions.reduce((sum, p) => {
+      const q = positionQuotes[p.ticker];
+      const price = q?.price ?? p.avgCost;
+      return sum + price * p.shares;
+    }, 0);
+    return (cash || 0) + holdingsValue;
+  }, [cash, positions, positionQuotes]);
+
+  // Keep the public "leaderboard" collection in sync with this user's opt-in
+  // choice and net worth. Only ticker-agnostic display info is written here —
+  // never email or cash/position breakdowns — since anyone can read this
+  // collection to render the board.
+  useEffect(() => {
+    if (!authUser) return;
+    if (cash === null) return; // wait until real data has loaded, avoid writing $0
+
+    const lbRef = doc(db, "leaderboard", authUser.uid);
+    const timer = setTimeout(() => {
+      if (leaderboardOptIn) {
+        setDoc(lbRef, {
+          displayName: userName || "Investor",
+          netWorth,
+          updatedAt: serverTimestamp(),
+        }).catch(() => {});
+      } else {
+        deleteDoc(lbRef).catch(() => {});
+      }
+    }, 1200); // small debounce so rapid trades don't spam writes
+
+    return () => clearTimeout(timer);
+  }, [authUser, leaderboardOptIn, netWorth, userName, cash]);
+
+  // Subscribe to the public leaderboard while that page is open.
+  useEffect(() => {
+    if (page !== "leaderboard") return;
+    setLeaderboardLoading(true);
+
+    const unsub = onSnapshot(
+      collection(db, "leaderboard"),
+      (snap) => {
+        const rows = snap.docs.map((d) => ({ uid: d.id, ...d.data() }));
+        rows.sort((a, b) => (b.netWorth || 0) - (a.netWorth || 0));
+        setLeaderboardRows(rows);
+        setLeaderboardLoading(false);
+      },
+      () => setLeaderboardLoading(false)
+    );
+
+    return () => unsub();
+  }, [page]);
+
+  function toggleLeaderboardOptIn() {
+    if (!authUser) return;
+    const next = !leaderboardOptIn;
+    setLeaderboardOptIn(next);
+    setDoc(doc(db, "users", authUser.uid), { leaderboardOptIn: next }, { merge: true }).catch(() => {});
+  }
 
   // Live quotes for everything currently held — powers the Positions table.
   useEffect(() => {
@@ -1555,6 +1955,40 @@ const showRawTickerOption =
     setSimLoading(false);
   }
 }
+  async function sendAiChatMessage(text) {
+    const message = (text ?? aiChatInput).trim();
+    if (!message || aiChatLoading) return;
+
+    const history = aiChatMessages.map((m) => ({ role: m.role, text: m.text }));
+
+    setAiChatMessages((prev) => [...prev, { role: "user", text: message }]);
+    setAiChatInput("");
+    setAiChatLoading(true);
+
+    try {
+      const response = await fetch(`${API}/ai/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, history, level: aiChatLevel }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "AI chat failed");
+      }
+
+      setAiChatMessages((prev) => [...prev, { role: "assistant", text: data.reply }]);
+    } catch (error) {
+      setAiChatMessages((prev) => [
+        ...prev,
+        { role: "assistant", text: `Sorry, I couldn't reply just now. ${error.message}` },
+      ]);
+    } finally {
+      setAiChatLoading(false);
+    }
+  }
+
   async function askSimulatorAI() {
     if (!simHistory || !hasInvested) {
       setSimAiMessages((prev) => [
@@ -1676,11 +2110,7 @@ function skipMonths(monthsToSkip) {
 
             {/* Market Overview Strip */}
             <div className="marketStrip">
-              {[
-                { name: "S&P 500", value: "5,304.72", change: +0.51 },
-                { name: "NASDAQ", value: "18,635.14", change: +0.73 },
-                { name: "DOW JONES", value: "42,051.06", change: +0.32 },
-              ].map((idx) => (
+              {marketIndices.map((idx) => (
                 <div className="marketStripItem" key={idx.name}>
                   <span className="marketStripName">{idx.name}</span>
                   <span className="marketStripValue">{idx.value}</span>
@@ -2026,6 +2456,11 @@ function skipMonths(monthsToSkip) {
                 )}
               </div>
             )}
+            {stockDetail && stockDetail.stale && (
+              <div className="staleNotice">
+                Showing last known data as of {new Date(stockDetail.as_of).toLocaleString()} — live data unavailable right now.
+              </div>
+            )}
 
             <div className="timeframes">
               {TIMEFRAMES.map((t) => (
@@ -2364,6 +2799,7 @@ function skipMonths(monthsToSkip) {
             <div className="chips">
               <button className={learnSection === "basics" ? "chipActive" : ""} onClick={() => setLearnSection("basics")}>Basics</button>
               <button className={learnSection === "metrics" ? "chipActive" : ""} onClick={() => setLearnSection("metrics")}>Key Metrics</button>
+              <button className={learnSection === "quiz" ? "chipActive" : ""} onClick={() => setLearnSection("quiz")}>Quizzes</button>
             </div>
 
             {learnSection === "basics" && (
@@ -2396,6 +2832,8 @@ function skipMonths(monthsToSkip) {
                 ))}
               </div>
             )}
+
+            {learnSection === "quiz" && <QuizSection />}
           </section>
         )}
 
@@ -2763,7 +3201,7 @@ function skipMonths(monthsToSkip) {
                         : "sim-ai-message assistant"
                     }
                   >
-                    {message.text}
+                    <FormattedText text={message.text} />
                   </div>
                 ))}
 
@@ -2801,12 +3239,115 @@ function skipMonths(monthsToSkip) {
           
         )}
 
-        {["ai", "leaderboard"].includes(page) && (
+        {page === "ai" && (
+          <section className="page aiChatPage">
+            <h1>AI Assistant</h1>
+            <p className="aiChatIntro">
+              Ask about investing concepts, key metrics, or how to use StockSense. Beginner-friendly, always.
+            </p>
+
+            <div className="aiChatLevelRow">
+              <span>Your level:</span>
+              {["beginner", "intermediate", "advanced"].map((lvl) => (
+                <button
+                  key={lvl}
+                  className={aiChatLevel === lvl ? "chipActive" : ""}
+                  onClick={() => setAiChatLevel(aiChatLevel === lvl ? "" : lvl)}
+                >
+                  {lvl.charAt(0).toUpperCase() + lvl.slice(1)}
+                </button>
+              ))}
+            </div>
+
+            <div className="aiChatCard">
+              <div className="aiChatMessages">
+                {aiChatMessages.map((m, i) => (
+                  <div key={i} className={`aiChatMessage ${m.role}`}>
+                    <FormattedText text={m.text} />
+                  </div>
+                ))}
+                {aiChatLoading && (
+                  <div className="aiChatMessage assistant">Thinking...</div>
+                )}
+              </div>
+
+              {aiChatMessages.length <= 1 && (
+                <div className="aiChatSuggestions">
+                  {aiChatSuggestions.map((s) => (
+                    <button key={s} className="aiChatSuggestion" onClick={() => sendAiChatMessage(s)}>
+                      {s}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              <div className="aiChatInputRow">
+                <input
+                  value={aiChatInput}
+                  placeholder="Ask a question about investing..."
+                  onChange={(e) => setAiChatInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && sendAiChatMessage()}
+                  disabled={aiChatLoading}
+                />
+                <button onClick={() => sendAiChatMessage()} disabled={aiChatLoading || !aiChatInput.trim()}>
+                  {aiChatLoading ? "..." : "Send"}
+                </button>
+              </div>
+            </div>
+
+            <p className="aiDisclaimer">Educational only — not financial advice.</p>
+          </section>
+        )}
+
+        {page === "leaderboard" && (
           <section className="page">
-            <h1>{page.toUpperCase()}</h1>
-            <div className="card">
-              <p>This page is a Milestone 1 placeholder.</p>
-              <p>Full feature will be developed later.</p>
+            <h1>Leaderboard</h1>
+            <p className="leaderboardIntro">
+              Ranked by total portfolio value. Everyone starts with ${STARTING_CASH.toLocaleString()} — it's all skill (and nerve) from there.
+            </p>
+
+            {authUser ? (
+              <div className="leaderboardOptCard">
+                <div className="leaderboardOptText">
+                  <h4>Show me on the leaderboard</h4>
+                  <p>Off by default. Turn this on to display your name and portfolio value publicly.</p>
+                </div>
+                <button
+                  className={`leaderboardToggle ${leaderboardOptIn ? "on" : "off"}`}
+                  onClick={toggleLeaderboardOptIn}
+                >
+                  {leaderboardOptIn ? "Visible ✓" : "Hidden"}
+                </button>
+              </div>
+            ) : (
+              <div className="leaderboardOptCard">
+                <div className="leaderboardOptText">
+                  <h4>Sign in to join</h4>
+                  <p>Create an account to get your $10,000 virtual portfolio and (optionally) join the board.</p>
+                </div>
+                <button className="leaderboardToggle off" onClick={() => setPage("account")}>Sign in</button>
+              </div>
+            )}
+
+            <div className="leaderboardTable">
+              {leaderboardLoading ? (
+                <div className="leaderboardEmpty">Loading leaderboard...</div>
+              ) : leaderboardRows.length === 0 ? (
+                <div className="leaderboardEmpty">No one's on the board yet — be the first to opt in!</div>
+              ) : (
+                leaderboardRows.map((row, i) => (
+                  <div key={row.uid} className={`leaderboardRow ${authUser && row.uid === authUser.uid ? "me" : ""}`}>
+                    <span className={`leaderboardRank ${i === 0 ? "top1" : i === 1 ? "top2" : i === 2 ? "top3" : ""}`}>
+                      #{i + 1}
+                    </span>
+                    <span className="leaderboardName">
+                      {row.displayName || "Investor"}
+                      {authUser && row.uid === authUser.uid && <span className="leaderboardYou">YOU</span>}
+                    </span>
+                    <span className="leaderboardValue">${(row.netWorth || 0).toFixed(2)}</span>
+                  </div>
+                ))
+              )}
             </div>
           </section>
         )}

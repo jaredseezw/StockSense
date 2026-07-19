@@ -149,7 +149,10 @@ def explain_simulator():
 
         response = client.models.generate_content(
             model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=prompt
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                tools=[grounding_tool],
+            ),
         )
 
         return jsonify({
@@ -177,3 +180,174 @@ def explain_simulator():
             return jsonify({"reply": fallback})
 
         return jsonify({"error": error_message}), 500
+
+
+# ---------------------------------------------------------------------------
+# POST /ai/chat
+# General-purpose finance/investing tutor chat, used by the AI Assistant tab.
+# Keeps a short rolling history so answers stay on-topic and conversational.
+# ---------------------------------------------------------------------------
+
+@ai_bp.route("/ai/chat", methods=["POST"])
+def ai_chat():
+    data = request.get_json() or {}
+
+    message = (data.get("message") or "").strip()
+    history = data.get("history") or []   # [{role: "user"|"assistant", text: "..."}]
+    level = (data.get("level") or "").strip()  # optional: "beginner" / "intermediate" / "advanced"
+
+    if not message:
+        return jsonify({"error": "Message is required"}), 400
+
+    if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
+        return jsonify({
+            "reply": (
+                "I'm not connected to Gemini yet, so I can't chat right now. "
+                "Add a GEMINI_API_KEY to the backend environment to turn me on."
+            )
+        })
+
+    system_preamble = f"""
+        You are StockSense AI, a friendly, encouraging investing and personal-finance tutor
+        built into the StockSense app.
+
+        Ground rules:
+        - Only discuss investing, the stock market, personal finance concepts, and how to use
+          the StockSense app itself. Politely steer other topics back to finance.
+        - Explain things in clear, beginner-friendly language with simple analogies.
+        - Never give personalized financial advice (e.g. never say "you should buy X" or
+          "sell Y now"). Instead explain concepts, trade-offs, and general principles, and
+          remind the user this is educational, not financial advice, whenever the topic could
+          be read as a recommendation.
+        - If the user seems unsure what to ask, suggest 2-3 example questions.
+        - Keep answers concise (roughly under 200 words) unless the user asks for more detail.
+        - Use **bold** for key terms sparingly, not for whole sentences.
+        {"- The user has told you their experience level is: " + level if level else ""}
+        """
+
+    convo = system_preamble + "\n\nConversation so far:\n"
+    for turn in history[-10:]:
+        speaker = "User" if turn.get("role") == "user" else "StockSense AI"
+        convo += f"{speaker}: {turn.get('text', '')}\n"
+    convo += f"User: {message}\nStockSense AI:"
+
+    try:
+        client = genai.Client()
+
+        grounding_tool = types.Tool(
+            google_search=types.GoogleSearch()
+        )
+
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+            contents=convo,
+            config=types.GenerateContentConfig(
+                tools=[grounding_tool],
+            ),
+        )
+
+        return jsonify({"reply": response.text})
+
+    except Exception as e:
+        error_message = str(e)
+
+        print("========== GEMINI CHAT ERROR ==========")
+        print(error_message)
+        print("========================================")
+
+        if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
+            return jsonify({
+                "reply": "I'm handling a lot of requests right now — please try again in a moment."
+            })
+
+        return jsonify({"error": error_message}), 500
+
+# ---------------------------------------------------------------------------
+# POST /ai/quiz-generate
+# Generates a fresh set of 10 MCQ questions for a given difficulty using
+# Gemini, so the Learn page quizzes don't repeat the same static bank every
+# time. Falls back gracefully — the frontend uses the static bank if this
+# endpoint errors or returns malformed data.
+# ---------------------------------------------------------------------------
+
+QUIZ_DIFFICULTY_GUIDANCE = {
+    "basic": "absolute beginners — cover core terms like stocks, ETFs, dividends, diversification, risk.",
+    "intermediate": "investors comfortable with basics — cover P/E, market cap, EPS, beta, dollar-cost averaging.",
+    "advanced": "experienced learners — cover correlation, yield curves, liquidity, growth vs value, expense ratios.",
+}
+
+
+@ai_bp.route("/ai/quiz-generate", methods=["POST"])
+def generate_quiz():
+    data = request.get_json() or {}
+    difficulty = (data.get("difficulty") or "basic").lower()
+
+    if difficulty not in QUIZ_DIFFICULTY_GUIDANCE:
+        return jsonify({"error": "difficulty must be basic, intermediate, or advanced"}), 400
+
+    if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
+        return jsonify({"error": "Gemini is not connected — use the static quiz bank instead."}), 503
+
+    prompt = f"""
+        Generate exactly 10 multiple-choice investing/finance quiz questions for {difficulty} level
+        learners: {QUIZ_DIFFICULTY_GUIDANCE[difficulty]}
+
+        Return ONLY a raw JSON array (no markdown fences, no commentary, no leading/trailing text).
+        Each element must be an object with exactly these keys:
+        - "q": the question text (string)
+        - "options": an array of exactly 4 short answer strings
+        - "correct": the 0-based index (integer) of the correct option in "options"
+
+        Keep questions factually safe (no specific real-time prices or dates that could be wrong).
+        Do not give personalized financial advice in any question or answer.
+        """
+
+    try:
+        client = genai.Client()
+
+        response = client.models.generate_content(
+            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
+            contents=prompt,
+        )
+
+        raw = (response.text or "").strip()
+
+        # Strip ```json fences if the model added them despite instructions
+        if raw.startswith("```"):
+            raw = raw.strip("`")
+            if raw.lower().startswith("json"):
+                raw = raw[4:]
+            raw = raw.strip()
+
+        import json
+        questions = json.loads(raw)
+
+        if not isinstance(questions, list) or len(questions) == 0:
+            raise ValueError("Model did not return a question list")
+
+        cleaned = []
+        for item in questions:
+            q = item.get("q")
+            options = item.get("options")
+            correct = item.get("correct")
+
+            if (
+                isinstance(q, str)
+                and isinstance(options, list)
+                and len(options) == 4
+                and isinstance(correct, int)
+                and 0 <= correct < 4
+            ):
+                cleaned.append({"q": q, "options": options, "correct": correct})
+
+        if len(cleaned) == 0:
+            raise ValueError("No valid questions after validation")
+
+        return jsonify({"difficulty": difficulty, "questions": cleaned})
+
+    except Exception as e:
+        error_message = str(e)
+        print("========== GEMINI QUIZ ERROR ==========")
+        print(error_message)
+        print("========================================")
+        return jsonify({"error": "Could not generate AI quiz questions right now."}), 500

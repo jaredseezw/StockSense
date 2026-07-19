@@ -14,9 +14,14 @@ TTL defaults (tunable via .env):
 
 import time
 import os
+from datetime import datetime
 from threading import Lock
 
 _store: dict = {}
+# Last successfully fetched value per key, kept around indefinitely (no TTL)
+# so we can serve it as a fallback if a live fetch fails (e.g. market closed,
+# Yahoo Finance hiccup). Overwritten every time a fetch succeeds.
+_last_good: dict = {}
 _lock = Lock()
 
 # TTL constants (seconds) — read from env so you can tune without redeploying
@@ -57,9 +62,22 @@ def clear():
         _store.clear()
 
 
+def _mark_stale(value, fetched_at: float):
+    """Tag dict responses with staleness info so the frontend can show
+    'last known price as of ...' instead of silently showing old data."""
+    if isinstance(value, dict):
+        value = dict(value)
+        value["stale"] = True
+        value["as_of"] = datetime.fromtimestamp(fetched_at).isoformat()
+    return value
+
+
 def cached(key: str, ttl: int, fn):
     """
     Helper: return cached value if fresh, otherwise call fn(), cache, and return.
+    If fn() raises (e.g. market closed, upstream API hiccup) and we have a
+    previously successful value for this key, serve that stale value instead
+    of failing outright — better a slightly old price than a broken page.
 
     Usage:
         data = cached("stock:AAPL:quote", TTL_QUOTE, lambda: fetch_quote("AAPL"))
@@ -67,6 +85,17 @@ def cached(key: str, ttl: int, fn):
     hit = get(key)
     if hit is not None:
         return hit
-    value = fn()
-    set(key, value, ttl)
-    return value
+
+    try:
+        value = fn()
+        set(key, value, ttl)
+        with _lock:
+            _last_good[key] = (value, time.time())
+        return value
+    except Exception:
+        with _lock:
+            fallback = _last_good.get(key)
+        if fallback is not None:
+            stale_value, fetched_at = fallback
+            return _mark_stale(stale_value, fetched_at)
+        raise
