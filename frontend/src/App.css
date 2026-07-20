@@ -3895,3 +3895,176 @@ body {
 .dashNewsItem:hover .dashNewsHeadline,
 .stockNewsItem:hover .stockNewsHeadline { color: #1f7d4c; text-decoration: underline; }
 .dashNewsSource, .stockNewsMeta { font-size: 0.75rem; color: #8a9e90; }
+
+/* ── Toast notifications ─────────────────────────────────────────────── */
+.appToast {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  background: #1f2a24;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+  animation: toastIn 0.25s ease-out;
+}
+.appToast-success { background: #1f7d4c; }
+.appToast-error { background: #c0392b; }
+.appToast-info { background: #2c3e50; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ── First-visit onboarding / guided tour ────────────────────────────── */
+.onboardBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 30, 24, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+  padding: 20px;
+  animation: onboardFadeIn 0.2s ease-out;
+}
+@keyframes onboardFadeIn { from { opacity: 0; } to { opacity: 1; } }
+.onboardCard {
+  background: #fff;
+  border-radius: 20px;
+  padding: 32px;
+  max-width: 440px;
+  width: 100%;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  text-align: left;
+}
+.onboardCard h2 { margin: 0 0 10px; font-size: 1.4rem; color: #1f2a24; }
+.onboardCard p { margin: 0 0 22px; color: #556155; line-height: 1.5; }
+.onboardCardActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.onboardPrimaryBtn {
+  background: #1f7d4c;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.onboardPrimaryBtn:hover { background: #185f3a; }
+.onboardSecondaryBtn {
+  background: #eef2ef;
+  color: #33463a;
+  border: none;
+  border-radius: 12px;
+  padding: 12px 20px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+.onboardSecondaryBtn:hover { background: #e0e6e2; }
+.onboardPrimaryBtn.small, .onboardSecondaryBtn.small { padding: 8px 14px; font-size: 0.82rem; border-radius: 10px; }
+
+.tourCard { max-width: 400px; }
+.tourProgress { font-size: 0.78rem; color: #7c8a7f; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.02em; }
+.tourProgressBar { height: 5px; background: #eef2ef; border-radius: 4px; margin-top: 6px; overflow: hidden; }
+.tourProgressFill { height: 100%; background: #1f7d4c; border-radius: 4px; transition: width 0.25s ease; }
+.tourSkipBtn { margin-right: auto; background: transparent; color: #8a9a8d; }
+.tourSkipBtn:hover { background: transparent; text-decoration: underline; color: #556155; }
+
+/* ── Non-blocking signup nudge toast ─────────────────────────────────── */
+.signupNudgeToast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  border: 1px solid #e0e6e2;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
+  z-index: 9998;
+  max-width: 480px;
+  width: calc(100% - 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: onboardFadeIn 0.25s ease-out;
+}
+.signupNudgeToast span { font-size: 0.9rem; color: #33463a; font-weight: 600; line-height: 1.4; }
+.signupNudgeActions { display: flex; gap: 8px; justify-content: flex-end; }
+
+@media (max-width: 640px) {
+  .signupNudgeToast { left: 20px; right: 20px; transform: none; width: auto; bottom: 16px; }
+  .onboardCard { padding: 24px; }
+}
+
+/* ── Buy/sell processing spinner ─────────────────────────────────────── */
+.btnSpinner {
+  display: inline-block;
+  width: 13px;
+  height: 13px;
+  border: 2px solid rgba(255,255,255,0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  margin-right: 6px;
+  vertical-align: middle;
+  animation: btnSpin 0.7s linear infinite;
+}
+@keyframes btnSpin { to { transform: rotate(360deg); } }
+
+/* ── Quiz: previous attempts + loading hint ──────────────────────────── */
+.quizPastAttemptsBtn {
+  grid-column: 1 / -1;
+  background: #eef2ef;
+  color: #33463a;
+  border: none;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
+  cursor: pointer;
+  font-size: 0.88rem;
+  justify-self: start;
+}
+.quizPastAttemptsBtn:hover { background: #e0e6e2; }
+.quizLoadingHint { font-size: 0.78rem; color: #7c8a7f; margin: 6px 0 0; }
+
+/* ── Ask AI about this stock ──────────────────────────────────────────── */
+.stockPageHeaderRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.askAiAboutStockBtn {
+  background: #1f7d4c;
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.askAiAboutStockBtn:hover { background: #185f3a; }
+
+/* ── Leaderboard top holding ──────────────────────────────────────────── */
+.leaderboardTopHolding {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #7c8a7f;
+  margin-top: 2px;
+}

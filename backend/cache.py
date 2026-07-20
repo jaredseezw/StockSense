@@ -14,6 +14,7 @@ TTL defaults (tunable via .env):
 
 import time
 import os
+import json
 from datetime import datetime
 from threading import Lock
 
@@ -21,8 +22,38 @@ _store: dict = {}
 # Last successfully fetched value per key, kept around indefinitely (no TTL)
 # so we can serve it as a fallback if a live fetch fails (e.g. market closed,
 # Yahoo Finance hiccup). Overwritten every time a fetch succeeds.
+#
+# Also persisted to disk (_LAST_GOOD_FILE). Free-tier hosts (Render/Railway)
+# restart the process often — an in-memory-only cache means every restart
+# wipes the fallback and the very next request after a restart shows raw
+# "N/A" if the live fetch fails too. Persisting to disk means we always have
+# *some* recent price to fall back to, even right after a cold start.
 _last_good: dict = {}
 _lock = Lock()
+
+_LAST_GOOD_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".last_good_cache.json")
+
+
+def _load_last_good_from_disk():
+    try:
+        with open(_LAST_GOOD_FILE, "r") as f:
+            raw = json.load(f)
+        # Stored as {key: [value, fetched_at]}
+        return {k: (v[0], v[1]) for k, v in raw.items()}
+    except Exception:
+        return {}
+
+
+def _save_last_good_to_disk():
+    try:
+        serialisable = {k: [v[0], v[1]] for k, v in _last_good.items()}
+        with open(_LAST_GOOD_FILE, "w") as f:
+            json.dump(serialisable, f)
+    except Exception:
+        pass  # disk persistence is best-effort — never let it break a request
+
+
+_last_good.update(_load_last_good_from_disk())
 
 # TTL constants (seconds) — read from env so you can tune without redeploying
 TTL_QUOTE   = int(os.getenv("CACHE_TTL_QUOTE",   60))
@@ -91,6 +122,7 @@ def cached(key: str, ttl: int, fn):
         set(key, value, ttl)
         with _lock:
             _last_good[key] = (value, time.time())
+            _save_last_good_to_disk()
         return value
     except Exception:
         with _lock:

@@ -72,10 +72,24 @@ def get_sectors():
                     pass
 
                 if price is None:
-                    from fetcher import _yahoo_quote
-                    q = _yahoo_quote(etf_ticker)
-                    price = _safe(q.get("regularMarketPrice"))
-                    prev = _safe(q.get("regularMarketPreviousClose"))
+                    try:
+                        from fetcher import _yahoo_quote
+                        q = _yahoo_quote(etf_ticker)
+                        price = _safe(q.get("regularMarketPrice"))
+                        prev = _safe(q.get("regularMarketPreviousClose"))
+                    except Exception:
+                        pass
+
+                if price is None:
+                    # Yahoo fully blocked — Finnhub quotes ETFs directly, no
+                    # proxy needed here (unlike raw indices).
+                    try:
+                        from fetcher import _finnhub_quote
+                        fh = _finnhub_quote(etf_ticker)
+                        price = _safe(fh.get("c"))
+                        prev = _safe(fh.get("pc"))
+                    except Exception:
+                        pass
 
                 if price is None:
                     raise ValueError(f"No price for {etf_ticker}")
@@ -93,7 +107,10 @@ def get_sectors():
             try:
                 results.append(cache.cached(f"market:sector:{etf_ticker}", cache.TTL_INDICES, _fetch_one))
             except Exception:
-                results.append({"sector": sector, "etf": etf_ticker, "change": 0.0, "price": None, "price_fmt": "N/A"})
+                # Live sources AND the persisted last-good cache both came up
+                # empty — very rare (e.g. brand-new deploy, never fetched
+                # successfully before). Label clearly instead of bare "N/A".
+                results.append({"sector": sector, "etf": etf_ticker, "change": 0.0, "price": None, "price_fmt": "Unavailable", "unavailable": True})
 
         # Sort by change descending (best sector first)
         results.sort(key=lambda r: r["change"], reverse=True)

@@ -319,6 +319,14 @@ def fetch_stock_detail(ticker: str) -> dict:
     debt_eq = _safe(info.get("debtToEquity"))
     roe = _safe(info.get("returnOnEquity"))
 
+    # Fifth-tier fallback: PE and EPS are mathematically linked to price
+    # (PE = price / EPS), so if every external source gave us one but not
+    # the other, derive the missing one instead of showing N/A.
+    if pe is None and eps is not None and eps != 0:
+        pe = round(price / eps, 2)
+    elif eps is None and pe is not None and pe != 0:
+        eps = round(price / pe, 2)
+
     if debt_eq and debt_eq > 20:
         debt_eq = round(debt_eq / 100, 2)
 
@@ -569,6 +577,34 @@ INDEX_TICKERS = {
     "DOW":     "^DJI",
 }
 
+# Finnhub's free tier doesn't quote raw indices (^GSPC etc), so when Yahoo is
+# fully blocked we fall back to a highly-correlated tracking ETF instead —
+# close enough for a dashboard strip, and much better than showing "N/A".
+INDEX_ETF_PROXY = {
+    "^GSPC": "SPY",
+    "^IXIC": "QQQ",
+    "^DJI":  "DIA",
+}
+
+
+def _finnhub_quote(symbol: str) -> dict:
+    """Thin wrapper around Finnhub's /quote endpoint. Returns {c, pc} (current,
+    previous close) or raises if unavailable."""
+    api_key = os.getenv("FINNHUB_API_KEY")
+    if not api_key:
+        raise ValueError("FINNHUB_API_KEY not set")
+    res = requests.get(
+        "https://finnhub.io/api/v1/quote",
+        params={"symbol": symbol, "token": api_key},
+        timeout=10,
+    )
+    res.raise_for_status()
+    data = res.json() or {}
+    if not data.get("c"):
+        raise ValueError(f"No Finnhub quote for {symbol}")
+    return data
+
+
 def fetch_indices() -> list:
     """
     Returns current price + daily % change for the three main indices.
@@ -597,9 +633,21 @@ def fetch_indices() -> list:
             if price is None:
                 # yfinance .info is frequently blocked on cloud hosts — fall
                 # back to the lighter Yahoo quote endpoint.
-                q = _yahoo_quote(ticker)
-                price = _safe(q.get("regularMarketPrice"))
-                prev = _safe(q.get("regularMarketPreviousClose"))
+                try:
+                    q = _yahoo_quote(ticker)
+                    price = _safe(q.get("regularMarketPrice"))
+                    prev = _safe(q.get("regularMarketPreviousClose"))
+                except Exception:
+                    pass
+
+            if price is None:
+                # Both Yahoo paths are blocked (common on cloud hosts without
+                # an auth crumb) — fall back to Finnhub via a tracking ETF.
+                proxy = INDEX_ETF_PROXY.get(ticker)
+                if proxy:
+                    fh = _finnhub_quote(proxy)
+                    price = _safe(fh.get("c"))
+                    prev = _safe(fh.get("pc"))
 
             if price is None:
                 raise ValueError(f"No price for {ticker}")
@@ -618,7 +666,11 @@ def fetch_indices() -> list:
             data = _cache.cached(f"market:index:{ticker}", _cache.TTL_INDICES, _fetch_one)
             results.append(data)
         except Exception:
-            results.append({"name": name, "ticker": ticker, "value": "N/A", "change": 0.0})
+            # Every live source AND the in-memory/disk last-good cache came
+            # up empty (e.g. very first request ever, nothing persisted
+            # yet). This should be rare — label it clearly rather than a
+            # bare "N/A" so the UI can show something sensible.
+            results.append({"name": name, "ticker": ticker, "value": "Unavailable", "change": 0.0, "unavailable": True})
 
     return results
 

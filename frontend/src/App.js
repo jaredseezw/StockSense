@@ -21,6 +21,7 @@ import {
   query as firestoreQuery,
   orderBy,
   limit,
+  getDocs,
 } from "firebase/firestore";
 import {
   LineChart,
@@ -666,7 +667,8 @@ function FormattedText({ text }) {
 
 // Static quiz flow: menu → in-progress → results. Tracks a per-difficulty
 // best score locally (localStorage) so users can retake and improve.
-function QuizSection() {
+function QuizSection({ authUser, onGuestStart }) {
+  const isGuest = !authUser;
   const [difficulty, setDifficulty] = useState(null); // null = showing menu
   const [activeQuestions, setActiveQuestions] = useState(null); // resolved question list in use
   const [loadingDiff, setLoadingDiff] = useState(null); // which difficulty is currently loading
@@ -674,6 +676,10 @@ function QuizSection() {
   const [answers, setAnswers] = useState([]); // [{selected, correct}]
   const [selected, setSelected] = useState(null);
   const [showResults, setShowResults] = useState(false);
+  const [showPastAttempts, setShowPastAttempts] = useState(false);
+  const [pastAttempts, setPastAttempts] = useState([]);
+  const [pastAttemptsLoading, setPastAttemptsLoading] = useState(false);
+  const [expandedAttemptId, setExpandedAttemptId] = useState(null);
 
   function bestScore(diff) {
     try {
@@ -692,6 +698,7 @@ function QuizSection() {
   // or takes too long, fall back to a random static question set — quietly,
   // with no "AI generated" labeling either way.
   async function startQuiz(diff) {
+    if (isGuest && onGuestStart) onGuestStart();
     setLoadingDiff(diff);
     setStep(0);
     setAnswers([]);
@@ -739,10 +746,49 @@ function QuizSection() {
       } catch {
         // localStorage unavailable — skip persisting best score
       }
+
+      // Save the attempt (score + which questions were missed) for signed-in
+      // users so they can review it later from "Previous attempts".
+      if (authUser) {
+        const incorrectQuestions = newAnswers
+          .map((a, i) => ({ ...a, i }))
+          .filter((a) => !a.correct)
+          .map((a) => ({
+            question: questions[a.i].q,
+            yourAnswer: questions[a.i].options[a.selected] ?? "No answer",
+            correctAnswer: questions[a.i].options[questions[a.i].correct],
+          }));
+
+        addDoc(collection(db, "users", authUser.uid, "quizAttempts"), {
+          difficulty,
+          score,
+          total: questions.length,
+          incorrectQuestions,
+          timestamp: serverTimestamp(),
+        }).catch(() => {
+          // Non-critical — don't block the results screen if this fails.
+        });
+      }
+
       setShowResults(true);
     } else {
       setStep(step + 1);
     }
+  }
+
+  function loadPastAttempts() {
+    if (!authUser) return;
+    setShowPastAttempts(true);
+    setPastAttemptsLoading(true);
+    const q = firestoreQuery(
+      collection(db, "users", authUser.uid, "quizAttempts"),
+      orderBy("timestamp", "desc"),
+      limit(15)
+    );
+    getDocs(q)
+      .then((snap) => setPastAttempts(snap.docs.map((d) => ({ id: d.id, ...d.data() }))))
+      .catch(() => setPastAttempts([]))
+      .finally(() => setPastAttemptsLoading(false));
   }
 
   function backToMenu() {
@@ -752,6 +798,40 @@ function QuizSection() {
 
   // ── Menu ──────────────────────────────────────────────────────────────
   if (!difficulty) {
+    if (showPastAttempts) {
+      return (
+        <div className="quizCard">
+          <div className="quizProgress">Previous attempts</div>
+          {pastAttemptsLoading ? (
+            <p>Loading your past attempts...</p>
+          ) : pastAttempts.length === 0 ? (
+            <p>No past attempts yet — finish a quiz and it'll show up here.</p>
+          ) : (
+            pastAttempts.map((attempt) => (
+              <div className="quizReviewItem" key={attempt.id}>
+                <div
+                  className="quizReviewQ"
+                  style={{ cursor: attempt.incorrectQuestions?.length ? "pointer" : "default" }}
+                  onClick={() => setExpandedAttemptId(expandedAttemptId === attempt.id ? null : attempt.id)}
+                >
+                  {(quizData[attempt.difficulty]?.label) || attempt.difficulty} — {attempt.score}/{attempt.total}
+                  {attempt.incorrectQuestions?.length > 0 && (expandedAttemptId === attempt.id ? " ▲" : " ▼")}
+                </div>
+                {expandedAttemptId === attempt.id && attempt.incorrectQuestions?.map((iq, idx) => (
+                  <div key={idx} className="quizReviewAns wrong" style={{ marginLeft: 12 }}>
+                    {iq.question} — you answered "{iq.yourAnswer}", correct was "{iq.correctAnswer}"
+                  </div>
+                ))}
+              </div>
+            ))
+          )}
+          <div className="quizActionsRow">
+            <button className="quizBackBtn" onClick={() => setShowPastAttempts(false)}>Back to quizzes</button>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="quizMenuGrid">
         {Object.entries(quizData).map(([key, d]) => (
@@ -761,11 +841,17 @@ function QuizSection() {
             <div className="quizDiffBest">Best score: {bestScore(key) ?? "—"}/10</div>
             <div className="quizDiffActions">
               <button className="quizStartBtn" onClick={() => startQuiz(key)} disabled={loadingDiff === key}>
-                {loadingDiff === key ? "Loading..." : "Start quiz"}
+                {loadingDiff === key ? "Generating quiz…" : "Start quiz"}
               </button>
             </div>
+            {loadingDiff === key && (
+              <p className="quizLoadingHint">Generating a personalised quiz — usually takes 5–10 seconds.</p>
+            )}
           </div>
         ))}
+        {authUser && (
+          <button className="quizPastAttemptsBtn" onClick={loadPastAttempts}>📜 View previous attempts</button>
+        )}
       </div>
     );
   }
@@ -1182,12 +1268,130 @@ function App() {
   const [authError, setAuthError] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  // ── Toast notifications (e.g. "Signed in!" / "Signed out!") ────────────
+  const [toast, setToast] = useState(null); // { message, type: "success"|"info"|"error" }
+  const toastTimerRef = useRef(null);
+  function showToast(message, type = "info") {
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    setToast({ message, type });
+    toastTimerRef.current = setTimeout(() => setToast(null), 3000);
+  }
+
+  // ── First-visit welcome + guided tour ───────────────────────────────────
+  const [showWelcomeModal, setShowWelcomeModal] = useState(false);
+  const [tourActive, setTourActive] = useState(false);
+  const [tourStep, setTourStep] = useState(0);
+
+  useEffect(() => {
+    try {
+      if (!localStorage.getItem("stocksense_hasSeenTutorialPrompt")) {
+        setShowWelcomeModal(true);
+      }
+    } catch {
+      // localStorage unavailable (private browsing etc) — just skip the prompt
+    }
+  }, []);
+
+  const TOUR_STEPS = [
+    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place." },
+    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker. Try typing \"AAPL\" or \"Tesla\"." },
+    { page: "search", title: "3. View stock details", body: "Click a result to see its live price, chart, and key metrics like P/E and EPS." },
+    { page: "portfolio", title: "4. Buy your first stock", body: "From any stock's page, enter a share amount and hit Buy — e.g. try 5 shares as a starting point." },
+    { page: "portfolio", title: "5. Check your portfolio", body: "See your holdings, gains/losses, and total portfolio value here." },
+    { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Try entering $1,000 with a past buy date and watch how it would've played out." },
+    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself." },
+    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What's a P/E ratio?\" to \"How does diversification work?\"" },
+    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else." },
+    { page: "dashboard", title: "10. You're ready! 🎉", body: "That's the full tour — jump in and start exploring." },
+  ];
+
+  function markTutorialSeen() {
+    try { localStorage.setItem("stocksense_hasSeenTutorialPrompt", "true"); } catch {}
+  }
+
+  function startTour() {
+    markTutorialSeen();
+    setShowWelcomeModal(false);
+    setTourActive(true);
+    setTourStep(0);
+    setPage(TOUR_STEPS[0].page);
+  }
+
+  function declineTour() {
+    markTutorialSeen();
+    setShowWelcomeModal(false);
+    if (!authUser) {
+      setTimeout(() => maybeNudgeSignup("welcome", "Create a free account to unlock your $10,000 virtual portfolio!"), 300);
+    }
+  }
+
+  function nextTourStep() {
+    const next = tourStep + 1;
+    if (next >= TOUR_STEPS.length) {
+      endTour();
+      return;
+    }
+    setTourStep(next);
+    setPage(TOUR_STEPS[next].page);
+  }
+
+  function prevTourStep() {
+    const prev = Math.max(0, tourStep - 1);
+    setTourStep(prev);
+    setPage(TOUR_STEPS[prev].page);
+  }
+
+  function endTour() {
+    setTourActive(false);
+    if (!authUser) {
+      setTimeout(() => maybeNudgeSignup("welcome", "Create a free account to unlock your $10,000 virtual portfolio!"), 300);
+    }
+  }
+
+  // ── Gentle, non-blocking signup nudges for guests ───────────────────────
+  // Each "key" (quiz, ai, leaderboard, welcome...) only nudges once per
+  // session — enticing, never forced, and never repeats on the same action.
+  const [signupNudge, setSignupNudge] = useState(null); // { message } | null
+  const nudgedKeysRef = useRef(new Set());
+  function maybeNudgeSignup(key, message) {
+    if (authUser) return false;
+    if (nudgedKeysRef.current.has(key)) return false;
+    nudgedKeysRef.current.add(key);
+    setSignupNudge({ message });
+    return true;
+  }
+
+  useEffect(() => {
+    if (page === "leaderboard" && !authUser) {
+      maybeNudgeSignup("leaderboard", "Sign up to get your $10,000 virtual portfolio and join the leaderboard!");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, authUser]);
+
   // ── Market indices strip (live) ─────────────────────────────────────────
   const [marketIndices, setMarketIndices] = useState([
     { name: "S&P 500", value: "—", change: 0 },
     { name: "NASDAQ", value: "—", change: 0 },
     { name: "DOW JONES", value: "—", change: 0 },
   ]);
+
+  // ── Rotating dashboard tip (the "💡" bar) ───────────────────────────────
+  const DASHBOARD_TIPS = [
+    { text: "💡 Unsure what P/E Ratio means? Learn key metrics in simple English.", action: () => { setLearnSection("metrics"); setPage("learn"); } },
+    { text: "💡 New here? Search any real stock and see live prices in the Search tab.", action: () => setPage("search") },
+    { text: "💡 Curious how a past investment would've played out? Try the Historical Simulator.", action: () => setPage("simulator") },
+    { text: "💡 Not sure where to start? Ask the AI Assistant anything about investing.", action: () => setPage("ai") },
+    { text: "💡 Test your knowledge — quizzes are in the Learn tab.", action: () => { setLearnSection("quiz"); setPage("learn"); } },
+    { text: "💡 See how your portfolio stacks up against others on the Leaderboard.", action: () => setPage("leaderboard") },
+  ];
+  const [dashboardTipIndex, setDashboardTipIndex] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => {
+      setDashboardTipIndex((i) => (i + 1) % DASHBOARD_TIPS.length);
+    }, 8000);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── AI Assistant chat state ─────────────────────────────────────────────
   const AI_CHAT_WELCOME = {
@@ -1636,6 +1840,22 @@ const showRawTickerOption =
     return (cash || 0) + holdingsValue;
   }, [cash, positions, positionQuotes]);
 
+  // Largest position by value, shown on the leaderboard as e.g. "AAPL 38%".
+  const topHolding = useMemo(() => {
+    if (!positions.length || !netWorth) return "";
+    let bestTicker = null;
+    let bestValue = -1;
+    for (const p of positions) {
+      const q = positionQuotes[p.ticker];
+      const price = q?.price ?? p.avgCost;
+      const value = price * p.shares;
+      if (value > bestValue) { bestValue = value; bestTicker = p.ticker; }
+    }
+    if (!bestTicker) return "";
+    const pct = Math.round((bestValue / netWorth) * 100);
+    return `${bestTicker} ${pct}%`;
+  }, [positions, positionQuotes, netWorth]);
+
   // Keep the public "leaderboard" collection in sync with this user's opt-in
   // choice and net worth. Only ticker-agnostic display info is written here —
   // never email or cash/position breakdowns — since anyone can read this
@@ -1650,6 +1870,7 @@ const showRawTickerOption =
         setDoc(lbRef, {
           displayName: userName || "Investor",
           netWorth,
+          topHolding,
           updatedAt: serverTimestamp(),
         }).catch(() => {});
       } else {
@@ -1658,7 +1879,7 @@ const showRawTickerOption =
     }, 1200); // small debounce so rapid trades don't spam writes
 
     return () => clearTimeout(timer);
-  }, [authUser, leaderboardOptIn, netWorth, userName, cash]);
+  }, [authUser, leaderboardOptIn, netWorth, topHolding, userName, cash]);
 
   // Subscribe to the public leaderboard while that page is open.
   useEffect(() => {
@@ -1854,15 +2075,46 @@ const showRawTickerOption =
         await signInWithEmailAndPassword(auth, email, password);
       }
       setEmail(""); setPassword(""); setDisplayName("");
+      showToast(authMode === "signup" ? "Account created — welcome! 🎉" : "Signed in!", "success");
+      // Always land on the Dashboard after auth, don't leave people staring
+      // at the login form.
+      setPage("dashboard");
     } catch (error) {
-      setAuthError(error.message.replace("Firebase: ", "").replace(/\(auth\/.*\)\.?/, "").trim());
+      setAuthError(friendlyAuthError(error, authMode));
     }
+  }
+
+  // Firebase's raw error messages ("Firebase: Error (auth/invalid-credential).")
+  // aren't user-friendly. Map the common codes to plain, specific copy —
+  // wrong password/email gets called out by name on login, and signup
+  // failures say exactly what's wrong instead of a generic "error".
+  function friendlyAuthError(error, mode) {
+    const code = error?.code || "";
+    if (mode === "signup") {
+      if (code === "auth/email-already-in-use") return "That email is already registered — try logging in instead.";
+      if (code === "auth/weak-password") return "That password is too weak — use at least 6 characters.";
+      if (code === "auth/invalid-email") return "That doesn't look like a valid email address.";
+      if (code === "auth/missing-password") return "Please enter a password.";
+    } else {
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        return "Wrong email or password.";
+      }
+      if (code === "auth/too-many-requests") return "Too many attempts — please wait a moment and try again.";
+      if (code === "auth/invalid-email") return "That doesn't look like a valid email address.";
+      if (code === "auth/missing-password") return "Please enter a password.";
+    }
+    // Fallback: still strip Firebase's noisy prefix/suffix rather than showing raw "error"
+    return (error?.message || "Something went wrong — please try again.")
+      .replace("Firebase: ", "")
+      .replace(/\(auth\/.*\)\.?/, "")
+      .trim();
   }
 
   async function handleLogout() {
     await signOut(auth);
     setUserName("Guest");
     setPage("account");
+    showToast("Signed out!", "info");
   }
 
   function getMyPosition(ticker) {
@@ -2013,6 +2265,15 @@ const showRawTickerOption =
     const message = (text ?? aiChatInput).trim();
     if (!message || aiChatLoading) return;
 
+    // Let guests try the AI Assistant, but nudge them to sign up after
+    // their first question rather than blocking — "limited but usable".
+    if (!authUser) {
+      const priorUserMessages = aiChatMessages.filter((m) => m.role === "user").length;
+      if (priorUserMessages >= 1) {
+        maybeNudgeSignup("ai", "Sign up to save your AI chat history and get unlimited questions!");
+      }
+    }
+
     // Only send recent history to the backend — keeps requests small and
     // avoids re-sending an ever-growing transcript.
     const history = aiChatMessages.slice(-12).map((m) => ({ role: m.role, text: m.text }));
@@ -2143,6 +2404,56 @@ function skipMonths(monthsToSkip) {
   return (
     <div className="app">
       {openMetric && <MetricModal metric={openMetric} onClose={() => setOpenMetric(null)} />}
+      {toast && (
+        <div className={`appToast appToast-${toast.type}`} role="status">
+          {toast.type === "success" ? "✅" : toast.type === "error" ? "⚠️" : "ℹ️"} {toast.message}
+        </div>
+      )}
+
+      {showWelcomeModal && (
+        <div className="onboardBackdrop">
+          <div className="onboardCard">
+            <h2>Welcome to StockSense! 👋</h2>
+            <p>First time here? Want a 60-second tour of how everything works?</p>
+            <div className="onboardCardActions">
+              <button className="onboardPrimaryBtn" onClick={startTour}>Yes, show me around</button>
+              <button className="onboardSecondaryBtn" onClick={declineTour}>No thanks</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tourActive && (
+        <div className="onboardBackdrop tourBackdrop">
+          <div className="onboardCard tourCard">
+            <div className="tourProgress">
+              Step {tourStep + 1} of {TOUR_STEPS.length}
+              <div className="tourProgressBar">
+                <div className="tourProgressFill" style={{ width: `${((tourStep + 1) / TOUR_STEPS.length) * 100}%` }} />
+              </div>
+            </div>
+            <h2>{TOUR_STEPS[tourStep].title}</h2>
+            <p>{TOUR_STEPS[tourStep].body}</p>
+            <div className="onboardCardActions">
+              {tourStep > 0 && <button className="onboardSecondaryBtn" onClick={prevTourStep}>← Back</button>}
+              <button className="onboardSecondaryBtn tourSkipBtn" onClick={endTour}>Skip tour</button>
+              <button className="onboardPrimaryBtn" onClick={nextTourStep}>
+                {tourStep === TOUR_STEPS.length - 1 ? "Finish" : "Next →"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {signupNudge && (
+        <div className="signupNudgeToast">
+          <span>✨ {signupNudge.message}</span>
+          <div className="signupNudgeActions">
+            <button className="onboardPrimaryBtn small" onClick={() => { setSignupNudge(null); setAuthMode("signup"); setPage("account"); }}>Sign up</button>
+            <button className="onboardSecondaryBtn small" onClick={() => setSignupNudge(null)}>Maybe later</button>
+          </div>
+        </div>
+      )}
 
       <aside className="sidebar">
         <div className="brand">
@@ -2181,8 +2492,14 @@ function skipMonths(monthsToSkip) {
             </div>
 
             <div className="dashboardGrid priority">
-              <div className="insightBar" onClick={() => setPage("learn")}>
-                💡 Unsure what P/E Ratio means? Learn key metrics in simple English.
+              <div
+                className="insightBar"
+                onClick={() => {
+                  DASHBOARD_TIPS[dashboardTipIndex].action();
+                  setDashboardTipIndex((i) => (i + 1) % DASHBOARD_TIPS.length);
+                }}
+              >
+                {DASHBOARD_TIPS[dashboardTipIndex].text}
               </div>
               {authUser ? (() => {
                 const livePos = positions.map(p => {
@@ -2515,7 +2832,18 @@ function skipMonths(monthsToSkip) {
 
         {page === "stock" && selectedStock && (
           <section className="page">
-            <button className="backBtn" onClick={() => setPage("search")}>← Back</button>
+            <div className="stockPageHeaderRow">
+              <button className="backBtn" onClick={() => setPage("search")}>← Back</button>
+              <button
+                className="askAiAboutStockBtn"
+                onClick={() => {
+                  setAiChatInput(`Can you tell me about ${selectedStock.ticker} (${stockDetail?.name || selectedStock.name})? What should I know before considering it?`);
+                  setPage("ai");
+                }}
+              >
+                🤖 Ask AI about this stock
+              </button>
+            </div>
             <h1>
               <span className="stockPageName">{stockDetail?.name || selectedStock.name}</span>
               <span className="stockPageTicker">{selectedStock.ticker}</span>
@@ -2621,14 +2949,14 @@ function skipMonths(monthsToSkip) {
                       disabled={tradeBusy}
                       onClick={() => executeTrade("buy", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
                     >
-                      Buy at ${stockDetail?.price_fmt || "—"}
+                      {tradeBusy ? <><span className="btnSpinner" /> Processing...</> : `Buy at $${stockDetail?.price_fmt || "—"}`}
                     </button>
                     <button
                       className="sim-primary-btn tradeSellBtn"
                       disabled={tradeBusy}
                       onClick={() => executeTrade("sell", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
                     >
-                      Sell
+                      {tradeBusy ? <><span className="btnSpinner" /> Processing...</> : "Sell"}
                     </button>
                   </div>
 
@@ -2928,7 +3256,12 @@ function skipMonths(monthsToSkip) {
               </div>
             )}
 
-            {learnSection === "quiz" && <QuizSection />}
+            {learnSection === "quiz" && (
+              <QuizSection
+                authUser={authUser}
+                onGuestStart={() => maybeNudgeSignup("quiz", "Sign up to save your quiz history and best scores!")}
+              />
+            )}
           </section>
         )}
 
@@ -3449,6 +3782,7 @@ function skipMonths(monthsToSkip) {
                     <span className="leaderboardName">
                       {row.displayName || "Investor"}
                       {authUser && row.uid === authUser.uid && <span className="leaderboardYou">YOU</span>}
+                      {row.topHolding && <span className="leaderboardTopHolding">Top: {row.topHolding}</span>}
                     </span>
                     <span className="leaderboardValue">${(row.netWorth || 0).toFixed(2)}</span>
                   </div>
