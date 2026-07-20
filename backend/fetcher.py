@@ -344,6 +344,18 @@ def fetch_stock_detail(ticker: str) -> dict:
                 div_yield_pct = last_good["div_yield"]
         except Exception:
             pass
+
+    # If dividendYield is STILL missing after every fallback tier, that's
+    # almost always because the stock genuinely doesn't pay a dividend —
+    # Yahoo/Finnhub omit the field entirely for non-payers rather than
+    # sending back an explicit 0, so it's indistinguishable from "the fetch
+    # failed" using this field alone. We can tell the two apart by checking
+    # whether we got real price data for this ticker (that comes from the
+    # price-history call, which is independent of the fundamentals fallback
+    # chain above) — if price fetched fine, treat the missing yield as a
+    # real 0% instead of an unhelpful "N/A".
+    if div_yield_pct is None and price is not None:
+        div_yield_pct = 0.0
     roe_pct = round(roe * 100, 1) if roe else None
 
     if market_cap:
@@ -387,12 +399,12 @@ def fetch_stock_detail(ticker: str) -> dict:
         "volume_ratio": round(volume / avg_volume, 2) if volume and avg_volume else None,
 
         "div_yield": div_yield_pct,
-        "div_yield_fmt": f"{div_yield_pct:.2f}%" if div_yield_pct else "N/A",
+        "div_yield_fmt": f"{div_yield_pct:.2f}%" if div_yield_pct is not None else "N/A",
 
         "annual_div": round(price * div_yield, 2) if price and div_yield else None,
 
         "eps": eps,
-        "eps_fmt": f"${eps:.2f}" if eps else "N/A",
+        "eps_fmt": f"${eps:.2f}" if eps is not None else "N/A",
 
         "week52_high": week52_high,
         "week52_low": week52_low,
@@ -403,13 +415,13 @@ def fetch_stock_detail(ticker: str) -> dict:
         "pct_from_high": round((price - week52_high) / week52_high * 100, 1),
 
         "beta": beta,
-        "beta_fmt": f"{beta:.2f}" if beta else "N/A",
+        "beta_fmt": f"{beta:.2f}" if beta is not None else "N/A",
 
         "debt_to_equity": debt_eq,
-        "debt_to_equity_fmt": f"{debt_eq:.2f}" if debt_eq else "N/A",
+        "debt_to_equity_fmt": f"{debt_eq:.2f}" if debt_eq is not None else "N/A",
 
         "roe": roe_pct,
-        "roe_fmt": f"{roe_pct:.1f}%" if roe_pct else "N/A",
+        "roe_fmt": f"{roe_pct:.1f}%" if roe_pct is not None else "N/A",
     }
 
 
@@ -600,6 +612,38 @@ INDEX_ETF_PROXY = {
 }
 
 
+def _stooq_quote(symbol: str) -> dict:
+    """
+    Free, keyless fallback quote source. Used as the very last resort for
+    price data (mainly ETFs/indices) when both Yahoo and Finnhub are
+    unavailable — e.g. Finnhub's FINNHUB_API_KEY isn't set on this deploy,
+    or Finnhub free-tier doesn't cover a given ETF. Stooq needs no key and
+    has no auth crumb requirement, so it works reliably from cloud hosts.
+    Returns {"c": last_close, "pc": prev_close} to match _finnhub_quote's
+    shape, or raises if unavailable.
+    """
+    # Stooq tickers are lowercase with a market suffix (.us for US-listed).
+    stooq_symbol = f"{symbol.lower()}.us"
+    url = f"https://stooq.com/q/d/l/?s={stooq_symbol}&i=d"
+    res = requests.get(url, headers=HEADERS, timeout=10)
+    res.raise_for_status()
+
+    lines = [ln for ln in res.text.strip().splitlines() if ln.strip()]
+    # First line is the CSV header (Date,Open,High,Low,Close,Volume). Stooq
+    # returns a plain "N/D" body (no valid CSV rows) for unknown symbols
+    # instead of an HTTP error, so we have to check row count ourselves.
+    if len(lines) < 3 or lines[0].lower().startswith("no data"):
+        raise ValueError(f"No Stooq data for {symbol}")
+
+    def _close_from(line):
+        parts = line.split(",")
+        return float(parts[4])
+
+    last_close = _close_from(lines[-1])
+    prev_close = _close_from(lines[-2])
+    return {"c": last_close, "pc": prev_close}
+
+
 def _finnhub_quote(symbol: str) -> dict:
     """Thin wrapper around Finnhub's /quote endpoint. Returns {c, pc} (current,
     previous close) or raises if unavailable."""
@@ -685,6 +729,19 @@ def fetch_indices() -> list:
                         fh = _finnhub_quote(proxy)
                         price = _safe(fh.get("c"))
                         prev = _safe(fh.get("pc"))
+                    except Exception:
+                        pass
+
+            if price is None:
+                # Finnhub also failed (often because FINNHUB_API_KEY isn't
+                # configured on this deploy) — try Stooq, which needs no key
+                # at all, via the same tracking ETF proxy.
+                proxy = INDEX_ETF_PROXY.get(ticker)
+                if proxy:
+                    try:
+                        sq = _stooq_quote(proxy)
+                        price = _safe(sq.get("c"))
+                        prev = _safe(sq.get("pc"))
                     except Exception:
                         pass
 

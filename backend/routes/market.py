@@ -92,6 +92,18 @@ def get_sectors():
                         pass
 
                 if price is None:
+                    # Finnhub also failed (often just a missing/rate-limited
+                    # FINNHUB_API_KEY on this deploy) — Stooq needs no key
+                    # at all, so try it before giving up entirely.
+                    try:
+                        from fetcher import _stooq_quote
+                        sq = _stooq_quote(etf_ticker)
+                        price = _safe(sq.get("c"))
+                        prev = _safe(sq.get("pc"))
+                    except Exception:
+                        pass
+
+                if price is None:
                     raise ValueError(f"No price for {etf_ticker}")
 
                 change_pct = round((price - prev) / prev * 100, 2) if price and prev else 0.0

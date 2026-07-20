@@ -1318,16 +1318,16 @@ function App() {
   }, []);
 
   const TOUR_STEPS = [
-    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place." },
-    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker. Try typing \"AAPL\" or \"Tesla\"." },
-    { page: "search", title: "3. View stock details", body: "Click a result to see its live price, chart, and key metrics like P/E and EPS." },
-    { page: "portfolio", title: "4. Buy your first stock", body: "From any stock's page, enter a share amount and hit Buy — e.g. try 5 shares as a starting point." },
-    { page: "portfolio", title: "5. Check your portfolio", body: "See your holdings, gains/losses, and total portfolio value here." },
-    { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Try entering $1,000 with a past buy date and watch how it would've played out." },
-    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself." },
-    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What's a P/E ratio?\" to \"How does diversification work?\"" },
-    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else." },
-    { page: "dashboard", title: "10. You're ready! 🎉", body: "That's the full tour — jump in and start exploring." },
+    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place.", tag: "This is the dashboard" },
+    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker. Try typing \"AAPL\" or \"Tesla\" once the tour ends.", tag: "This is search" },
+    { page: "search", title: "3. View stock details", body: "Click a result to see its live price, chart, and key metrics like P/E and EPS.", tag: "Results appear here" },
+    { page: "portfolio", title: "4. Buy your first stock", body: "Once you're signed in, open any stock's page, enter a share amount, and hit Buy. Below is a sample portfolio so you can see what it looks like once you've made a few trades.", tag: "Sample portfolio" },
+    { page: "portfolio", title: "5. Track your portfolio", body: "This is where you'll see your holdings, gains/losses, and total value once you start trading.", tag: "Sample portfolio" },
+    { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Try entering $1,000 with a past buy date and watch how it would've played out.", tag: "This is the simulator" },
+    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself.", tag: "This is Learn" },
+    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What's a P/E ratio?\" to \"How does diversification work?\"", tag: "This is the AI Assistant" },
+    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else.", tag: "This is the leaderboard" },
+    { page: "dashboard", title: "10. You're ready! 🎉", body: "That's the full tour. Create a free account to get $10,000 in demo cash and start practicing for real.", tag: "All done" },
   ];
 
   // Cycle the tour card through corners instead of always centering it —
@@ -2501,15 +2501,19 @@ function skipMonths(monthsToSkip) {
 
       {tourActive && (
         <>
+          {/* Blocks clicks on the real page underneath — the tour is meant to
+              be watched, not clicked through, so nothing here should be
+              interactive except the tour card itself. */}
+          <div className="tourClickBlocker" />
+
           {/* Only the nav is blurred (except the tab we're currently explaining) —
               the actual page content stays fully sharp so people can see what
               the step is talking about. See the .sidebar.tourDimSidebar rules. */}
           <div
             className={`tourFloatCard tourCorner-${TOUR_CORNERS[tourStep % TOUR_CORNERS.length]}`}
           >
-            <div className={`tourArrow tourArrow-${TOUR_CORNERS[tourStep % TOUR_CORNERS.length]}`}>
-              {TOUR_STEPS[tourStep].page === "dashboard" && tourStep === 0 ? "👉 this is the dashboard" : "👈 look here"}
-            </div>
+            <button className="tourSkipCorner" onClick={endTour} aria-label="Skip tour">Skip ✕</button>
+            <div className="tourArrow">{TOUR_STEPS[tourStep].tag}</div>
             <div className="tourProgress">
               Step {tourStep + 1} of {TOUR_STEPS.length}
               <div className="tourProgressBar">
@@ -2518,9 +2522,8 @@ function skipMonths(monthsToSkip) {
             </div>
             <h2>{TOUR_STEPS[tourStep].title}</h2>
             <p>{TOUR_STEPS[tourStep].body}</p>
-            <div className="onboardCardActions">
+            <div className="onboardCardActions tourCardActions">
               {tourStep > 0 && <button className="onboardSecondaryBtn" onClick={prevTourStep}>← Back</button>}
-              <button className="onboardSecondaryBtn tourSkipBtn" onClick={endTour}>Skip tour</button>
               <button className="onboardPrimaryBtn" onClick={nextTourStep}>
                 {tourStep === TOUR_STEPS.length - 1 ? "Finish" : "Next →"}
               </button>
@@ -3149,7 +3152,55 @@ function skipMonths(monthsToSkip) {
           <section className="page">
             <h1>My Portfolio</h1>
 
-            {!authUser ? (
+            {!authUser && tourActive ? (
+              (() => {
+                const sample = [
+                  { ticker: "AAPL", name: "Apple Inc.", change: 1.24, price: 213.42, value: 1067.10, unrealised: 42.30, shares: 5 },
+                  { ticker: "NVDA", name: "Nvidia Corp.", change: -0.83, price: 121.05, value: 1210.50, unrealised: -18.60, shares: 10 },
+                  { ticker: "VOO", name: "S&P 500 ETF", change: 0.41, price: 512.88, value: 2564.40, unrealised: 76.10, shares: 5 },
+                ];
+                const holdingsValue = sample.reduce((sum, p) => sum + p.value, 0);
+                const cashSample = 5158.00;
+                const totalValue = cashSample + holdingsValue;
+                const totalUnrealised = sample.reduce((sum, p) => sum + p.unrealised, 0);
+                return (
+                  <div className="tourSampleWrap">
+                    <div className="tourSampleBadge">📽️ Sample data — this is what your portfolio will look like</div>
+                    <div className="stats">
+                      <div className="card"><p>Total Value</p><h2>${totalValue.toFixed(2)}</h2></div>
+                      <div className="card">
+                        <p>Unrealised P&L</p>
+                        <h2 className={totalUnrealised >= 0 ? "green" : "red"}>
+                          {totalUnrealised >= 0 ? "↑" : "↓"} ${Math.abs(totalUnrealised).toFixed(2)}
+                        </h2>
+                      </div>
+                      <div className="card"><p>Cash Balance</p><h2>${cashSample.toFixed(2)}</h2></div>
+                    </div>
+                    <div className="card portfolioPositionsCard">
+                      <h3>Positions</h3>
+                      <div className="table head">
+                        {["Stock", "% Change", "Current Price", "Value", "Unrealised P&L", "Qty"].map((label) => (
+                          <span key={label}>{label}</span>
+                        ))}
+                      </div>
+                      {sample.map((h) => (
+                        <div className="table" key={h.ticker}>
+                          <b>
+                            <span className="rowTicker">{h.ticker}</span>
+                            <small className="rowName">{h.name}</small>
+                          </b>
+                          <span className={h.change >= 0 ? "green" : "red"}>{h.change >= 0 ? "↑" : "↓"} {h.change}%</span>
+                          <span>${h.price.toFixed(2)}</span>
+                          <span>${h.value.toFixed(2)}</span>
+                          <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised).toFixed(2)}</span>
+                          <span>{h.shares}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()
+            ) : !authUser ? (
               <div className="card tradeSignupCard">
                 <h2>Sign up now to get $10,000 demo cash 💰</h2>
                 <p>Create a free account and start buying and selling real stocks at live prices — no real money, no risk, just practice.</p>
@@ -3389,10 +3440,7 @@ function skipMonths(monthsToSkip) {
                     <input value={authUser.email} readOnly className="readonlyInput"/>
                   </div>
 
-                  <div className="accountField">
-                    <label>Account Type</label>
-                    <input value="Email / Password" readOnly className="readonlyInput"/>
-                  </div>
+                  <button className="replayTutorialBtn" onClick={startTour}>▶ Replay Tutorial</button>
 
                   <button className="logoutBtn" onClick={handleLogout}>Log Out</button>
 
@@ -3411,6 +3459,7 @@ function skipMonths(monthsToSkip) {
                 <>
                   <h3>{authMode === "login" ? "Welcome back" : "Create your account"}</h3>
                   <p>Sign in to save your StockSense profile and future portfolio data.</p>
+                  <button type="button" className="replayTutorialBtn small" onClick={startTour}>▶ Replay Tutorial</button>
 
                   <form onSubmit={handleAuthSubmit}>
                     {authMode === "signup" && (
