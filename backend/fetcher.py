@@ -331,6 +331,19 @@ def fetch_stock_detail(ticker: str) -> dict:
         debt_eq = round(debt_eq / 100, 2)
 
     div_yield_pct = round(div_yield * 100, 2) if div_yield and div_yield < 1 else div_yield
+
+    # dividendYield is the field Yahoo most commonly omits on an otherwise-
+    # successful response (rate limiting tends to be field-level, not
+    # request-level). Rather than showing "N/A" when we had a good value
+    # just minutes ago, carry the last known-good dividend yield forward.
+    if div_yield_pct is None:
+        try:
+            import cache as _cache
+            last_good = _cache.get_last_good(f"stock:detail:{ticker}")
+            if last_good and last_good.get("div_yield") is not None:
+                div_yield_pct = last_good["div_yield"]
+        except Exception:
+            pass
     roe_pct = round(roe * 100, 1) if roe else None
 
     if market_cap:
@@ -641,13 +654,39 @@ def fetch_indices() -> list:
                     pass
 
             if price is None:
+                # Both Yahoo paths failed for the raw index ticker itself —
+                # before reaching for Finnhub (which needs an API key that
+                # may not be configured), try Yahoo again but on the
+                # tracking ETF proxy (SPY/QQQ/DIA), since Yahoo sometimes
+                # blocks index tickers specifically but not ETFs.
+                proxy = INDEX_ETF_PROXY.get(ticker)
+                if proxy:
+                    try:
+                        t2 = _ticker(proxy)
+                        info2 = t2.info
+                        price = _safe(info2.get("regularMarketPrice") or info2.get("currentPrice"))
+                        prev = _safe(info2.get("previousClose") or info2.get("regularMarketPreviousClose"))
+                    except Exception:
+                        pass
+                    if price is None:
+                        try:
+                            q2 = _yahoo_quote(proxy)
+                            price = _safe(q2.get("regularMarketPrice"))
+                            prev = _safe(q2.get("regularMarketPreviousClose"))
+                        except Exception:
+                            pass
+
+            if price is None:
                 # Both Yahoo paths are blocked (common on cloud hosts without
                 # an auth crumb) — fall back to Finnhub via a tracking ETF.
                 proxy = INDEX_ETF_PROXY.get(ticker)
                 if proxy:
-                    fh = _finnhub_quote(proxy)
-                    price = _safe(fh.get("c"))
-                    prev = _safe(fh.get("pc"))
+                    try:
+                        fh = _finnhub_quote(proxy)
+                        price = _safe(fh.get("c"))
+                        prev = _safe(fh.get("pc"))
+                    except Exception:
+                        pass
 
             if price is None:
                 raise ValueError(f"No price for {ticker}")

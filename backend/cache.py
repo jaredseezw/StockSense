@@ -103,6 +103,17 @@ def _mark_stale(value, fetched_at: float):
     return value
 
 
+def get_last_good(key: str):
+    """Return the last successfully-fetched value for a key (no staleness
+    tagging), or None if we've never fetched it successfully. Useful for
+    patching individual fields (e.g. dividendYield) that a live fetch
+    dropped even though the fetch overall succeeded — Yahoo intermittently
+    omits specific fundamentals fields without failing the whole request."""
+    with _lock:
+        entry = _last_good.get(key)
+    return entry[0] if entry else None
+
+
 def cached(key: str, ttl: int, fn):
     """
     Helper: return cached value if fresh, otherwise call fn(), cache, and return.

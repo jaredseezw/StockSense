@@ -3717,25 +3717,39 @@ body {
 
 /* ── QUIZZES ──────────────────────────────────────────────────────────── */
 
-.quizMenuGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 18px; }
+.quizMenuGrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 22px; }
+.quizGuestNotice {
+  grid-column: 1 / -1;
+  background: #eafaf0;
+  border: 1px solid #cdeedb;
+  color: #1f7d4c;
+  font-weight: 600;
+  font-size: 0.92rem;
+  border-radius: 14px;
+  padding: 14px 18px;
+}
 .quizDiffCard {
   background: white;
   border: 1px solid #e2ede4;
   border-radius: 18px;
-  padding: 22px;
+  padding: 30px 26px;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
   cursor: pointer;
   transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 .quizDiffCard:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(31,125,76,0.12); }
-.quizDiffCard h3 { margin: 0 0 6px 0; }
-.quizDiffCard p { color: #5a7868; font-size: 0.88rem; margin: 0 0 14px 0; }
-.quizDiffBest { font-size: 0.8rem; font-weight: 700; color: #1f7d4c; margin-bottom: 18px; }
+.quizDiffCard h3 { margin: 0 0 8px 0; font-size: 1.2rem; }
+.quizDiffCard p { color: #5a7868; font-size: 0.92rem; margin: 0 0 16px 0; flex: 1; }
+.quizDiffBest { font-size: 0.82rem; font-weight: 700; color: #1f7d4c; margin-bottom: 18px; }
 .quizCard {
   background: white;
   border: 1px solid #e2ede4;
   border-radius: 20px;
-  padding: 28px;
-  max-width: 640px;
+  padding: 32px;
+  max-width: 720px;
+  width: 100%;
 }
 .quizProgress { font-size: 0.82rem; color: #5a7868; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
 .quizQuestion { font-size: 1.15rem; font-weight: 700; margin-bottom: 20px; }
@@ -3766,9 +3780,19 @@ body {
 .quizResultsScore { font-size: 2.4rem; font-weight: 800; color: #1f7d4c; margin: 6px 0 4px; }
 .quizReviewItem { padding: 12px 0; border-top: 1px solid #eef3ef; }
 .quizReviewQ { font-weight: 700; margin-bottom: 6px; }
-.quizReviewAns { font-size: 0.88rem; }
+.quizReviewQ.small { font-size: 0.92rem; }
+.quizReviewAns { font-size: 0.88rem; margin-bottom: 2px; }
 .quizReviewAns.right { color: #1f7d4c; }
 .quizReviewAns.wrong { color: #d9534f; }
+.quizReviewItemNested {
+  margin-left: 16px;
+  padding: 10px 14px;
+  border-top: none;
+  border-left: 3px solid #eef3ef;
+  background: #fafcfb;
+  border-radius: 0 10px 10px 0;
+  margin-bottom: 8px;
+}
 .quizActionsRow { display: flex; gap: 10px; margin-top: 20px; }
 .quizActionsRow button {
   border: none;
@@ -3919,6 +3943,34 @@ body {
   to { opacity: 1; transform: translateY(0); }
 }
 
+.fullscreenNotice {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9700;
+  background: #fff8e6;
+  border: 1px solid #f3d98b;
+  color: #6b5300;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border-radius: 12px;
+  padding: 10px 16px;
+  max-width: min(560px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+}
+.fullscreenNotice button {
+  background: transparent;
+  border: none;
+  color: #6b5300;
+  cursor: pointer;
+  font-size: 0.9rem;
+  flex-shrink: 0;
+}
+
 /* ── First-visit onboarding / guided tour ────────────────────────────── */
 .onboardBackdrop {
   position: fixed;
@@ -3937,14 +3989,14 @@ body {
 .onboardCard {
   background: #fff;
   border-radius: 20px;
-  padding: 32px;
-  max-width: 440px;
+  padding: 40px;
+  max-width: 560px;
   width: 100%;
   box-shadow: 0 20px 60px rgba(0,0,0,0.25);
   text-align: left;
 }
-.onboardCard h2 { margin: 0 0 10px; font-size: 1.4rem; color: #1f2a24; }
-.onboardCard p { margin: 0 0 22px; color: #556155; line-height: 1.5; }
+.onboardCard h2 { margin: 0 0 12px; font-size: 1.6rem; color: #1f2a24; }
+.onboardCard p { margin: 0 0 26px; color: #556155; line-height: 1.6; font-size: 1.02rem; }
 .onboardCardActions {
   display: flex;
   gap: 10px;
@@ -3975,38 +4027,101 @@ body {
 .onboardSecondaryBtn:hover { background: #e0e6e2; }
 .onboardPrimaryBtn.small, .onboardSecondaryBtn.small { padding: 8px 14px; font-size: 0.82rem; border-radius: 10px; }
 
-.tourCard { max-width: 400px; }
 .tourProgress { font-size: 0.78rem; color: #7c8a7f; font-weight: 700; margin-bottom: 10px; letter-spacing: 0.02em; }
 .tourProgressBar { height: 5px; background: #eef2ef; border-radius: 4px; margin-top: 6px; overflow: hidden; }
 .tourProgressFill { height: 100%; background: #1f7d4c; border-radius: 4px; transition: width 0.25s ease; }
 .tourSkipBtn { margin-right: auto; background: transparent; color: #8a9a8d; }
 .tourSkipBtn:hover { background: transparent; text-decoration: underline; color: #556155; }
 
-/* ── Non-blocking signup nudge toast ─────────────────────────────────── */
-.signupNudgeToast {
-  position: fixed;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: #fff;
-  border: 1px solid #e0e6e2;
-  border-radius: 16px;
-  padding: 16px 20px;
-  box-shadow: 0 12px 32px rgba(0,0,0,0.18);
-  z-index: 9998;
-  max-width: 480px;
-  width: calc(100% - 40px);
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  animation: onboardFadeIn 0.25s ease-out;
+/* ── Guided tour: sectional blur instead of full-screen blur ────────────
+   Only the sidebar's non-active tabs blur; the page content being
+   described stays perfectly sharp. */
+.sidebar.tourDimSidebar { position: relative; z-index: 9500; }
+.sidebar.tourDimSidebar .nav:not(.active) {
+  filter: blur(2.5px);
+  opacity: 0.45;
+  transition: filter 0.25s ease, opacity 0.25s ease;
+  pointer-events: none;
 }
-.signupNudgeToast span { font-size: 0.9rem; color: #33463a; font-weight: 600; line-height: 1.4; }
-.signupNudgeActions { display: flex; gap: 8px; justify-content: flex-end; }
+.sidebar.tourDimSidebar .nav.active {
+  position: relative;
+  box-shadow: 0 0 0 3px #ffd166, 0 4px 14px rgba(255, 209, 102, 0.4);
+  border-radius: 10px;
+  z-index: 2;
+}
+.sidebar.tourDimSidebar .brand,
+.sidebar.tourDimSidebar .userBox {
+  filter: blur(2.5px);
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+/* Tour explanation card — floats in a rotating corner with a small arrow
+   annotation instead of a big centered modal covering everything. */
+.tourFloatCard {
+  position: fixed;
+  z-index: 10000;
+  max-width: 340px;
+  background: #fff;
+  border-radius: 18px;
+  padding: 22px 24px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.28);
+  animation: onboardFadeIn 0.2s ease-out;
+}
+.tourFloatCard h2 { margin: 0 0 8px; font-size: 1.15rem; color: #1f2a24; }
+.tourFloatCard p { margin: 0 0 18px; color: #556155; line-height: 1.5; font-size: 0.92rem; }
+.tourFloatCard .onboardCardActions { justify-content: flex-end; }
+.tourCorner-tr { top: 90px; right: 28px; }
+.tourCorner-tl { top: 90px; left: 260px; }
+.tourCorner-br { bottom: 28px; right: 28px; }
+.tourCorner-bl { bottom: 28px; left: 260px; }
+.tourArrow {
+  display: inline-block;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #1f7d4c;
+  background: #eafaf0;
+  border-radius: 20px;
+  padding: 5px 12px;
+  margin-bottom: 10px;
+}
+
+@media (max-width: 900px) {
+  .tourCorner-tl, .tourCorner-bl { left: 16px; }
+  .tourFloatCard { max-width: calc(100vw - 32px); }
+}
+
+/* ── Glaring, repeating signup modal (not a dismiss-and-forget toast) ─── */
+.signupNudgeBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 30, 24, 0.6);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10500;
+  padding: 20px;
+  animation: onboardFadeIn 0.2s ease-out;
+}
+.signupNudgeModal {
+  background: #fff;
+  border-radius: 20px;
+  padding: 36px;
+  max-width: 440px;
+  width: 100%;
+  text-align: center;
+  box-shadow: 0 24px 64px rgba(0,0,0,0.3);
+}
+.signupNudgeIcon { font-size: 2.2rem; margin-bottom: 10px; }
+.signupNudgeModal h2 { margin: 0 0 10px; font-size: 1.3rem; color: #1f2a24; }
+.signupNudgeModal p { margin: 0 0 24px; color: #556155; line-height: 1.5; font-size: 0.95rem; }
+.signupNudgeActions { display: flex; gap: 10px; justify-content: center; }
 
 @media (max-width: 640px) {
-  .signupNudgeToast { left: 20px; right: 20px; transform: none; width: auto; bottom: 16px; }
-  .onboardCard { padding: 24px; }
+  .onboardCard { padding: 28px; }
+  .signupNudgeModal { padding: 28px; }
 }
 
 /* ── Buy/sell processing spinner ─────────────────────────────────────── */
@@ -4059,6 +4174,22 @@ body {
   cursor: pointer;
 }
 .askAiAboutStockBtn:hover { background: #185f3a; }
+.refreshStockBtn {
+  background: #eef2ef;
+  color: #33463a;
+  border: none;
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.refreshStockBtn:hover { background: #e0e6e2; }
+.refreshStockBtn:disabled { opacity: 0.7; cursor: default; }
 
 /* ── Leaderboard top holding ──────────────────────────────────────────── */
 .leaderboardTopHolding {

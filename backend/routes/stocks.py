@@ -92,6 +92,8 @@ def get_stock(ticker: str):
         return fetch_stock_detail(ticker)
 
     try:
+        if request.args.get("refresh") in ("1", "true", "yes"):
+            cache.delete(cache_key)
         data = cache.cached(cache_key, cache.TTL_METRICS, _fetch)
         return jsonify(make_json_safe(data))
 

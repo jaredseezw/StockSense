@@ -682,6 +682,7 @@ function QuizSection({ authUser, onGuestStart }) {
   const [expandedAttemptId, setExpandedAttemptId] = useState(null);
 
   function bestScore(diff) {
+    if (isGuest) return null; // guests never have a saved score
     try {
       return localStorage.getItem(`quizBest_${diff}`);
     } catch {
@@ -740,11 +741,13 @@ function QuizSection({ authUser, onGuestStart }) {
 
     if (step + 1 >= questions.length) {
       const score = newAnswers.filter((a) => a.correct).length;
-      try {
-        const prevBest = Number(localStorage.getItem(`quizBest_${difficulty}`) || 0);
-        if (score > prevBest) localStorage.setItem(`quizBest_${difficulty}`, String(score));
-      } catch {
-        // localStorage unavailable — skip persisting best score
+      if (authUser) {
+        try {
+          const prevBest = Number(localStorage.getItem(`quizBest_${difficulty}`) || 0);
+          if (score > prevBest) localStorage.setItem(`quizBest_${difficulty}`, String(score));
+        } catch {
+          // localStorage unavailable — skip persisting best score
+        }
       }
 
       // Save the attempt (score + which questions were missed) for signed-in
@@ -818,8 +821,10 @@ function QuizSection({ authUser, onGuestStart }) {
                   {attempt.incorrectQuestions?.length > 0 && (expandedAttemptId === attempt.id ? " ▲" : " ▼")}
                 </div>
                 {expandedAttemptId === attempt.id && attempt.incorrectQuestions?.map((iq, idx) => (
-                  <div key={idx} className="quizReviewAns wrong" style={{ marginLeft: 12 }}>
-                    {iq.question} — you answered "{iq.yourAnswer}", correct was "{iq.correctAnswer}"
+                  <div key={idx} className="quizReviewItem quizReviewItemNested">
+                    <div className="quizReviewQ small">{idx + 1}. {iq.question}</div>
+                    <div className="quizReviewAns wrong">Your answer: {iq.yourAnswer} ✗</div>
+                    <div className="quizReviewAns right">Correct answer: {iq.correctAnswer} ✓</div>
                   </div>
                 ))}
               </div>
@@ -834,18 +839,25 @@ function QuizSection({ authUser, onGuestStart }) {
 
     return (
       <div className="quizMenuGrid">
+        {isGuest && (
+          <div className="quizGuestNotice">
+            ✨ Sign in to track your quiz history and see your improvement over time.
+          </div>
+        )}
         {Object.entries(quizData).map(([key, d]) => (
           <div className="quizDiffCard" key={key}>
             <h3>{d.label}</h3>
             <p>{d.desc}</p>
-            <div className="quizDiffBest">Best score: {bestScore(key) ?? "—"}/10</div>
+            <div className="quizDiffBest">
+              {isGuest ? "Sign in to save your best score" : `Best score: ${bestScore(key) ?? "—"}/10`}
+            </div>
             <div className="quizDiffActions">
               <button className="quizStartBtn" onClick={() => startQuiz(key)} disabled={loadingDiff === key}>
-                {loadingDiff === key ? "Generating quiz…" : "Start quiz"}
+                {loadingDiff === key ? "Preparing your quiz…" : "Start quiz"}
               </button>
             </div>
             {loadingDiff === key && (
-              <p className="quizLoadingHint">Generating a personalised quiz — usually takes 5–10 seconds.</p>
+              <p className="quizLoadingHint">Personalising your questions — usually takes 5–10 seconds.</p>
             )}
           </div>
         ))}
@@ -1250,6 +1262,19 @@ function SimulatorChart({ history, buyIndex, currentIndex }) {
 function App() {
   const [page, setPage] = useState("dashboard");
   const [query, setQuery] = useState("");
+
+  // ── Narrow / half-window viewport notice ─────────────────────────────────
+  // The layout is built for full-screen desktop/laptop use — half-width
+  // windows or unusual monitor shapes can look wonky, so nudge people
+  // toward full-screen rather than silently rendering a broken-looking UI.
+  const [viewportWidth, setViewportWidth] = useState(typeof window !== "undefined" ? window.innerWidth : 1920);
+  const [dismissedWidthNotice, setDismissedWidthNotice] = useState(false);
+  useEffect(() => {
+    function onResize() { setViewportWidth(window.innerWidth); }
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  const isNarrowViewport = viewportWidth < 1024;
   const [selectedStock, setSelectedStock] = useState(null);
   const [recent, setRecent] = useState(["NVDA", "AMZN", "AAPL"]);
   const [sortKey, setSortKey] = useState("change");
@@ -1305,6 +1330,11 @@ function App() {
     { page: "dashboard", title: "10. You're ready! 🎉", body: "That's the full tour — jump in and start exploring." },
   ];
 
+  // Cycle the tour card through corners instead of always centering it —
+  // keeps things visually interesting and out of the way of the content
+  // being explained.
+  const TOUR_CORNERS = ["tr", "bl", "br", "tl"];
+
   function markTutorialSeen() {
     try { localStorage.setItem("stocksense_hasSeenTutorialPrompt", "true"); } catch {}
   }
@@ -1348,18 +1378,28 @@ function App() {
     }
   }
 
-  // ── Gentle, non-blocking signup nudges for guests ───────────────────────
-  // Each "key" (quiz, ai, leaderboard, welcome...) only nudges once per
-  // session — enticing, never forced, and never repeats on the same action.
+  // ── Glaring, repeating signup prompts for guests ─────────────────────────
+  // Every time a guest takes an action (quiz, AI assistant, similar/historical
+  // stock lookup, viewing the leaderboard, etc.) they get nudged again — this
+  // is intentionally NOT a one-per-session toast anymore, since a single
+  // dismissible popup was too easy to ignore. A short cooldown just stops the
+  // same click from firing the modal twice.
   const [signupNudge, setSignupNudge] = useState(null); // { message } | null
-  const nudgedKeysRef = useRef(new Set());
+  const lastNudgeAtRef = useRef(0);
   function maybeNudgeSignup(key, message) {
     if (authUser) return false;
-    if (nudgedKeysRef.current.has(key)) return false;
-    nudgedKeysRef.current.add(key);
+    const now = Date.now();
+    if (now - lastNudgeAtRef.current < 4000) return false; // debounce rapid-fire triggers
+    lastNudgeAtRef.current = now;
     setSignupNudge({ message });
     return true;
   }
+
+  // As soon as a guest actually signs in/up, immediately clear any lingering
+  // nudge/toast so it doesn't sit on screen claiming they still need to sign up.
+  useEffect(() => {
+    if (authUser) setSignupNudge(null);
+  }, [authUser]);
 
   useEffect(() => {
     if (page === "leaderboard" && !authUser) {
@@ -1426,7 +1466,7 @@ function App() {
   const [txLog, setTxLog] = useState([]);
   const [tradeShares, setTradeShares] = useState("");
   const [tradeError, setTradeError] = useState("");
-  const [tradeBusy, setTradeBusy] = useState(false);
+  const [tradeBusy, setTradeBusy] = useState(null); // null | "buy" | "sell"
   const [tradeMsg, setTradeMsg] = useState("");
 
   // ── Chart state ─────────────────────────────────────────────────────────
@@ -1629,13 +1669,20 @@ const showRawTickerOption =
   }, [selectedSector, page]);
 
   // Fetch full stock detail when a stock is selected
+  const [stockRefreshing, setStockRefreshing] = useState(false);
+  function loadStockDetail(ticker, { isRefresh } = {}) {
+    if (!ticker) return;
+    if (isRefresh) setStockRefreshing(true);
+    else setStockLoading(true);
+    fetch(`${API}/stock/${ticker}${isRefresh ? "?refresh=1" : ""}`)
+      .then(r => r.json())
+      .then(data => { setStockDetail(data); setStockLoading(false); setStockRefreshing(false); })
+      .catch(() => { setStockLoading(false); setStockRefreshing(false); });
+  }
   useEffect(() => {
     if (!selectedStock) return;
-    setStockLoading(true);
-    fetch(`${API}/stock/${selectedStock.ticker}`)
-      .then(r => r.json())
-      .then(data => { setStockDetail(data); setStockLoading(false); })
-      .catch(() => setStockLoading(false));
+    loadStockDetail(selectedStock.ticker);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedStock]);
 
   // Fetch recent news for the selected stock (last 30 days)
@@ -2123,17 +2170,40 @@ const showRawTickerOption =
 
   async function executeTrade(type, ticker, name, shares, price) {
     if (!authUser) { setTradeError("Sign in to trade."); return; }
-    const numShares = Number(shares);
+
+    // Round to at most 2 decimal places and enforce a 0.01 minimum — no
+    // more floating-point dust like "0.19999999999999996 shares".
+    const numShares = Math.round(Number(shares) * 100) / 100;
+
     if (!numShares || numShares <= 0) { setTradeError("Enter a valid number of shares."); return; }
+    if (numShares < 0.01) { setTradeError("Minimum trade size is 0.01 shares."); return; }
     if (!price || price <= 0) { setTradeError("Price unavailable — try again in a moment."); return; }
 
-    setTradeBusy(true);
+    // Validate up front — before flipping on the spinner — so a doomed
+    // trade (e.g. selling shares you don't own) fails instantly instead of
+    // sitting in "Processing..." for no reason.
+    const currentPosition = getMyPosition(ticker);
+    const ownedShares = currentPosition?.shares || 0;
+    const total = Math.round(numShares * price * 100) / 100;
+
+    if (type === "buy" && cash != null && total > cash) {
+      setTradeError(`Not enough cash. You have $${cash.toFixed(2)}, this trade costs $${total.toFixed(2)}.`);
+      return;
+    }
+    if (type === "sell" && numShares > ownedShares + 1e-9) {
+      setTradeError(ownedShares > 0
+        ? `You only own ${ownedShares} shares of ${ticker}.`
+        : `You don't own any shares of ${ticker} yet.`);
+      return;
+    }
+
+    // Only the button that was actually clicked shows "Processing..."
+    setTradeBusy(type);
     setTradeError("");
     setTradeMsg("");
 
     const userRef = doc(db, "users", authUser.uid);
     const positionRef = doc(db, "users", authUser.uid, "positions", ticker);
-    const total = Math.round(numShares * price * 100) / 100;
 
     try {
       await runTransaction(db, async (tx) => {
@@ -2146,18 +2216,20 @@ const showRawTickerOption =
           if (total > currentCash) {
             throw new Error(`Not enough cash. You have $${currentCash.toFixed(2)}, this trade costs $${total.toFixed(2)}.`);
           }
-          const newShares = (currentPos?.shares || 0) + numShares;
+          const newSharesRaw = (currentPos?.shares || 0) + numShares;
+          const newShares = Math.round(newSharesRaw * 100) / 100;
           const newCost = ((currentPos?.shares || 0) * (currentPos?.avgCost || 0) + total) / newShares;
           tx.set(positionRef, { ticker, name, shares: newShares, avgCost: newCost, updatedAt: serverTimestamp() });
           tx.update(userRef, { cash: currentCash - total });
         } else {
           // sell — no shorting, can only sell what you own
-          const ownedShares = currentPos?.shares || 0;
-          if (numShares > ownedShares + 1e-9) {
-            throw new Error(`You only own ${ownedShares} shares of ${ticker}.`);
+          const ownedNow = currentPos?.shares || 0;
+          if (numShares > ownedNow + 1e-9) {
+            throw new Error(`You only own ${ownedNow} shares of ${ticker}.`);
           }
-          const remaining = ownedShares - numShares;
-          if (remaining < 1e-6) {
+          const remainingRaw = ownedNow - numShares;
+          const remaining = Math.round(remainingRaw * 100) / 100;
+          if (remaining < 0.01) {
             tx.delete(positionRef);
           } else {
             tx.update(positionRef, { shares: remaining, updatedAt: serverTimestamp() });
@@ -2175,7 +2247,7 @@ const showRawTickerOption =
     } catch (err) {
       setTradeError(err.message || "Trade failed.");
     } finally {
-      setTradeBusy(false);
+      setTradeBusy(null);
     }
   }
 
@@ -2265,13 +2337,10 @@ const showRawTickerOption =
     const message = (text ?? aiChatInput).trim();
     if (!message || aiChatLoading) return;
 
-    // Let guests try the AI Assistant, but nudge them to sign up after
-    // their first question rather than blocking — "limited but usable".
+    // Let guests try the AI Assistant, but nudge them to sign up every time
+    // they use it — not just once per session.
     if (!authUser) {
-      const priorUserMessages = aiChatMessages.filter((m) => m.role === "user").length;
-      if (priorUserMessages >= 1) {
-        maybeNudgeSignup("ai", "Sign up to save your AI chat history and get unlimited questions!");
-      }
+      maybeNudgeSignup("ai", "Sign up to save your AI chat history and get unlimited questions!");
     }
 
     // Only send recent history to the backend — keeps requests small and
@@ -2410,6 +2479,13 @@ function skipMonths(monthsToSkip) {
         </div>
       )}
 
+      {isNarrowViewport && !dismissedWidthNotice && (
+        <div className="fullscreenNotice">
+          <span>🖥️ StockSense is designed for full-screen use on a desktop or laptop — things may look a little off in a half-width window or on unusual screen shapes.</span>
+          <button onClick={() => setDismissedWidthNotice(true)} aria-label="Dismiss">✕</button>
+        </div>
+      )}
+
       {showWelcomeModal && (
         <div className="onboardBackdrop">
           <div className="onboardCard">
@@ -2424,8 +2500,16 @@ function skipMonths(monthsToSkip) {
       )}
 
       {tourActive && (
-        <div className="onboardBackdrop tourBackdrop">
-          <div className="onboardCard tourCard">
+        <>
+          {/* Only the nav is blurred (except the tab we're currently explaining) —
+              the actual page content stays fully sharp so people can see what
+              the step is talking about. See the .sidebar.tourDimSidebar rules. */}
+          <div
+            className={`tourFloatCard tourCorner-${TOUR_CORNERS[tourStep % TOUR_CORNERS.length]}`}
+          >
+            <div className={`tourArrow tourArrow-${TOUR_CORNERS[tourStep % TOUR_CORNERS.length]}`}>
+              {TOUR_STEPS[tourStep].page === "dashboard" && tourStep === 0 ? "👉 this is the dashboard" : "👈 look here"}
+            </div>
             <div className="tourProgress">
               Step {tourStep + 1} of {TOUR_STEPS.length}
               <div className="tourProgressBar">
@@ -2442,20 +2526,24 @@ function skipMonths(monthsToSkip) {
               </button>
             </div>
           </div>
-        </div>
+        </>
       )}
 
       {signupNudge && (
-        <div className="signupNudgeToast">
-          <span>✨ {signupNudge.message}</span>
-          <div className="signupNudgeActions">
-            <button className="onboardPrimaryBtn small" onClick={() => { setSignupNudge(null); setAuthMode("signup"); setPage("account"); }}>Sign up</button>
-            <button className="onboardSecondaryBtn small" onClick={() => setSignupNudge(null)}>Maybe later</button>
+        <div className="signupNudgeBackdrop">
+          <div className="signupNudgeModal">
+            <div className="signupNudgeIcon">🔒</div>
+            <h2>Sign up to keep going</h2>
+            <p>{signupNudge.message}</p>
+            <div className="signupNudgeActions">
+              <button className="onboardPrimaryBtn" onClick={() => { setSignupNudge(null); setAuthMode("signup"); setPage("account"); }}>Yes, sign up</button>
+              <button className="onboardSecondaryBtn" onClick={() => setSignupNudge(null)}>Maybe later</button>
+            </div>
           </div>
         </div>
       )}
 
-      <aside className="sidebar">
+      <aside className={`sidebar ${tourActive ? "tourDimSidebar" : ""}`}>
         <div className="brand">
           <img src="/logo.png" alt="StockSense" className="brandLogo" />
           StockSense
@@ -2835,6 +2923,14 @@ function skipMonths(monthsToSkip) {
             <div className="stockPageHeaderRow">
               <button className="backBtn" onClick={() => setPage("search")}>← Back</button>
               <button
+                className="refreshStockBtn"
+                onClick={() => loadStockDetail(selectedStock.ticker, { isRefresh: true })}
+                disabled={stockRefreshing}
+                title="Refresh live data"
+              >
+                {stockRefreshing ? <><span className="btnSpinner" /> Refreshing...</> : "🔄 Refresh"}
+              </button>
+              <button
                 className="askAiAboutStockBtn"
                 onClick={() => {
                   setAiChatInput(`Can you tell me about ${selectedStock.ticker} (${stockDetail?.name || selectedStock.name})? What should I know before considering it?`);
@@ -2927,7 +3023,7 @@ function skipMonths(monthsToSkip) {
                     </div>
                     <div className="tradeCashInfo">
                       <span>You own</span>
-                      <strong>{getMyPosition(selectedStock.ticker)?.shares ?? 0} shares</strong>
+                      <strong>{Number(getMyPosition(selectedStock.ticker)?.shares ?? 0).toFixed(2).replace(/\.00$/, "")} shares</strong>
                     </div>
                   </div>
 
@@ -2937,8 +3033,8 @@ function skipMonths(monthsToSkip) {
                       <input
                         className="sim-input"
                         type="number"
-                        min="0"
-                        step="0.0001"
+                        min="0.01"
+                        step="0.01"
                         placeholder="e.g. 2.5"
                         value={tradeShares}
                         onChange={(e) => setTradeShares(e.target.value)}
@@ -2946,17 +3042,17 @@ function skipMonths(monthsToSkip) {
                     </div>
                     <button
                       className="sim-primary-btn"
-                      disabled={tradeBusy}
+                      disabled={!!tradeBusy}
                       onClick={() => executeTrade("buy", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
                     >
-                      {tradeBusy ? <><span className="btnSpinner" /> Processing...</> : `Buy at $${stockDetail?.price_fmt || "—"}`}
+                      {tradeBusy === "buy" ? <><span className="btnSpinner" /> Processing...</> : `Buy at $${stockDetail?.price_fmt || "—"}`}
                     </button>
                     <button
                       className="sim-primary-btn tradeSellBtn"
-                      disabled={tradeBusy}
+                      disabled={!!tradeBusy}
                       onClick={() => executeTrade("sell", selectedStock.ticker, stockDetail?.name || selectedStock.name, tradeShares, stockDetail?.price)}
                     >
-                      {tradeBusy ? <><span className="btnSpinner" /> Processing...</> : "Sell"}
+                      {tradeBusy === "sell" ? <><span className="btnSpinner" /> Processing...</> : "Sell"}
                     </button>
                   </div>
 
@@ -3519,7 +3615,13 @@ function skipMonths(monthsToSkip) {
                     />
                     </div>
 
-                    <button className="sim-primary-btn" onClick={() => setHasInvested(true)}>
+                    <button
+                      className="sim-primary-btn"
+                      onClick={() => {
+                        setHasInvested(true);
+                        if (!authUser) maybeNudgeSignup("simulator", "Sign up to save your simulations and track them over time!");
+                      }}
+                    >
                       Invest ${investmentAmount}
                     </button>
                   </div>
