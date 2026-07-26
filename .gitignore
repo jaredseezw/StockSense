@@ -11,4 +11,7 @@ frontend/node_modules/
 .env.local
 
 # System files
-.DS_Store
+.DS_Storebackend/.venv/
+backend/venv/
+frontend/test-results/
+frontend/playwright-report/
