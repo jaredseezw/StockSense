@@ -1402,11 +1402,11 @@ function App() {
   }, [authUser]);
 
   useEffect(() => {
-    if (page === "leaderboard" && !authUser) {
+    if (page === "leaderboard" && !authUser && !tourActive) {
       maybeNudgeSignup("leaderboard", "Sign up to get your $10,000 virtual portfolio and join the leaderboard!");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, authUser]);
+  }, [page, authUser, tourActive]);
 
   // ── Market indices strip (live) ─────────────────────────────────────────
   const [marketIndices, setMarketIndices] = useState([
@@ -1958,21 +1958,38 @@ const showRawTickerOption =
     setTimeout(() => setLeaderboardJustToggled(false), 400);
   }
 
-  // Live quotes for everything currently held — powers the Positions table.
+  // Live quotes for everything currently held — powers the Positions table
+  // and net worth. Refreshes immediately whenever positions change (buy/sell)
+  // AND on a 30s timer, so the portfolio value keeps moving with the market
+  // even if you never trade again — not just right after a trade.
   useEffect(() => {
     if (positions.length === 0) {
       setPositionQuotes({});
       return;
     }
+
+    let cancelled = false;
     const tickers = positions.map((p) => p.ticker).join(",");
-    fetch(`${API}/stocks/trending?tickers=${encodeURIComponent(tickers)}&n=${positions.length}`)
-      .then((r) => r.json())
-      .then((data) => {
-        const map = {};
-        (Array.isArray(data) ? data : []).forEach((q) => { map[q.ticker] = q; });
-        setPositionQuotes(map);
-      })
-      .catch(() => {});
+
+    function refreshQuotes() {
+      fetch(`${API}/stocks/trending?tickers=${encodeURIComponent(tickers)}&n=${positions.length}`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (cancelled) return;
+          const map = {};
+          (Array.isArray(data) ? data : []).forEach((q) => { map[q.ticker] = q; });
+          setPositionQuotes(map);
+        })
+        .catch(() => {});
+    }
+
+    refreshQuotes(); // immediately, e.g. right after a trade
+    const intervalId = setInterval(refreshQuotes, 30000); // then every 30s
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
   }, [positions]);
 
   const hour = new Date().getHours();

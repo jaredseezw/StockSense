@@ -104,6 +104,23 @@ def get_sectors():
                         pass
 
                 if price is None:
+                    # Last resort: every scrape-style endpoint above (.info,
+                    # /v7/quote, Finnhub, Stooq) can be blocked on free hosts.
+                    # yf.download() hits Yahoo's chart endpoint instead, which
+                    # is what the (working) Top Movers card already relies on.
+                    try:
+                        hist = yf.download(etf_ticker, period="5d", interval="1d",
+                                            progress=False, auto_adjust=True)
+                        if isinstance(hist.columns, __import__("pandas").MultiIndex):
+                            hist.columns = hist.columns.get_level_values(0)
+                        closes = hist["Close"].dropna()
+                        if len(closes) >= 2:
+                            price = round(float(closes.iloc[-1]), 2)
+                            prev = round(float(closes.iloc[-2]), 2)
+                    except Exception:
+                        pass
+
+                if price is None:
                     raise ValueError(f"No price for {etf_ticker}")
 
                 change_pct = round((price - prev) / prev * 100, 2) if price and prev else 0.0

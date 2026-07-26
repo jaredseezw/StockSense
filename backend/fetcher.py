@@ -746,6 +746,28 @@ def fetch_indices() -> list:
                         pass
 
             if price is None:
+                # Last resort: every scrape-style endpoint above (.info,
+                # /v7/quote, Finnhub, Stooq) can get blocked on free hosts.
+                # yf.download() hits a different Yahoo endpoint (the chart
+                # API) that fetch_movers() already relies on successfully —
+                # reuse it here for the raw ticker, then the ETF proxy.
+                for dl_symbol in [ticker, INDEX_ETF_PROXY.get(ticker)]:
+                    if not dl_symbol:
+                        continue
+                    try:
+                        hist = yf.download(dl_symbol, period="5d", interval="1d",
+                                            progress=False, auto_adjust=True)
+                        if isinstance(hist.columns, pd.MultiIndex):
+                            hist.columns = hist.columns.get_level_values(0)
+                        closes = hist["Close"].dropna()
+                        if len(closes) >= 2:
+                            price = round(float(closes.iloc[-1]), 2)
+                            prev = round(float(closes.iloc[-2]), 2)
+                            break
+                    except Exception:
+                        continue
+
+            if price is None:
                 raise ValueError(f"No price for {ticker}")
 
             change_pct = round((price - prev) / prev * 100, 2) if price and prev else 0.0
