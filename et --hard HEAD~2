@@ -1,0 +1,71 @@
+[33m4ad63a2[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m fixes3
+[33m7c8eee1[m fixes2
+[33m072955d[m fixes1
+[33me6b3d8c[m Merge branch 'main' of https://github.com/jaredseezw/StockSense
+[33m29a882e[m Add automated unit integration and system tests
+[33mb71e63d[m fix1
+[33m3311928[m Add google genai dependency
+[33m93b1c88[m Add automated testing documentation and tests
+[33m60372cb[m v2
+[33m6517c53[m v2
+[33m4f1a86b[m v1
+[33mf2027a0[m implementing features 3
+[33m6f2b74a[m implementing features 2
+[33m2f6565b[m implementing features
+[33m88d7727[m Add gunicorn for Render deployment
+[33mdbbf345[m Merge pull request #7 from jaredseezw/feature/historical-simulator
+[33m8f65154[m[33m ([m[1;31morigin/feature/historical-simulator[m[33m)[m Add simulator AI coach and news context
+[33m5b70f07[m Merge pull request #6 from jaredseezw/feature/historical-simulator
+[33m499c9e3[m Fix simulator ticker fallback build error
+[33mde779e4[m Merge branch 'feature/historical-simulator' of https://github.com/jaredseezw/StockSense into feature/historical-simulator
+[33m72ca261[m Add news-based simulator AI explanations
+[33m1553d1b[m Merge branch 'main' into feature/historical-simulator
+[33maceb750[m Add simulator AI coach and side chat (unfinished)
+[33m2fcd4b2[m fix 6
+[33m6fcdad3[m fix 5
+[33me4b6732[m fix 3
+[33m04775bf[m fix 2
+[33m3e210e0[m fix 1
+[33m9a5ad85[m Fixing ESLint Errors
+[33m680f347[m Added Working Portfolio, Basic Investing Guide, Firestore
+[33mc8223a7[m Merge pull request #5 from jaredseezw/feature/historical-simulator
+[33mf961fa6[m Hide invalid NaN stock metrics
+[33m9649654[m Merge pull request #4 from jaredseezw/feature/historical-simulator
+[33m8e16671[m Fix stock routes and JSON and movers fallback
+[33m23d60ae[m Merge pull request #3 from jaredseezw/feature/historical-simulator
+[33m26268ec[m Filter invalid simulator price data
+[33m7f5b64e[m Merge pull request #2 from jaredseezw/feature/historical-simulator
+[33m9aad92f[m Style simulator gains and losses
+[33m76c3ba4[m Fix simulator ticker selection
+[33m30bece8[m Merge pull request #1 from jaredseezw/feature/historical-simulator
+[33mac72fb3[m Add historical investment simulator
+[33mfc171b7[m Fix Firebase API key
+[33m306c897[m Update README.md
+[33mcb7157a[m allow deployed frontend to call backend
+[33mf22b5f1[m complete working stock search proof of concept
+[33me90e08c[m Reduce stock universe again
+[33m4a829d8[m Reduce stock universe
+[33m70f7ff2[m v17
+[33mbbf38d5[m v16
+[33m93c12e3[m v15
+[33md06cc85[m v14
+[33m2b6378d[m v13
+[33mc3e25e1[m v12
+[33m8650b0b[m[33m ([m[1;31mmyrepo/main[m[33m)[m vercel redeploy final
+[33m2bc2431[m trigger vercel deploy from rannliu
+[33mfc880a0[m trigger vercel deploy from rannliu
+[33m019c7f7[m v11
+[33m71a062a[m v10
+[33md8fd74a[m v9
+[33me1035ce[m v8
+[33m21d7359[m v7
+[33m47c3354[m v6
+[33m5992b8e[m v5
+[33m3f8edfb[m v4
+[33m1618cdd[m v3
+[33m49a00d9[m v2
+[33m60dc5a1[m Add basic stock data backend API
+[33me22f166[m v1
+[33m269a864[m test
+[33m0b7ac99[m Fix header formatting in README.md
+[33m7ec80da[m Initial commit

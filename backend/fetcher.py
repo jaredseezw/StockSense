@@ -297,9 +297,19 @@ def fetch_stock_detail(ticker: str) -> dict:
     if hist.empty:
         raise ValueError(f"No stock data found for {ticker}")
 
+    # Yahoo sometimes returns today's daily bar before the market has closed —
+    # Open/High/Low/Volume are already populated but Close is still NaN. Taking
+    # .iloc[-1] blindly in that case turns price/price_fmt into "nan", which is
+    # what was showing up as "—" (Price row) and "$$nan" (Buy button) on the
+    # frontend. Drop any rows with a missing Close so we always read the last
+    # *complete* bar instead.
+    hist = hist.dropna(subset=["Close"])
+    if hist.empty:
+        raise ValueError(f"No valid close price found for {ticker}")
+
     price = float(hist["Close"].iloc[-1])
     prev = float(hist["Close"].iloc[-2]) if len(hist) > 1 else None
-    volume = int(hist["Volume"].iloc[-1]) if "Volume" in hist else None
+    volume = int(hist["Volume"].iloc[-1]) if "Volume" in hist and not pd.isna(hist["Volume"].iloc[-1]) else None
     week52_high = float(hist["High"].max())
     week52_low = float(hist["Low"].min())
 
