@@ -7,13 +7,6 @@ news_bp = Blueprint("news", __name__)
 
 @news_bp.route("/news/<ticker>")
 def get_stock_news(ticker):
-    api_key = os.getenv("FINNHUB_API_KEY")
-
-    if not api_key:
-        return jsonify({
-            "error": "FINNHUB_API_KEY is missing from backend environment."
-        }), 500
-
     from_date = request.args.get("from")
     to_date = request.args.get("to")
 
@@ -21,6 +14,13 @@ def get_stock_news(ticker):
         return jsonify({
             "error": "Missing from/to date. Use /api/news/AAPL?from=2020-01-01&to=2020-12-31"
         }), 400
+
+    api_key = os.getenv("FINNHUB_API_KEY")
+
+    if not api_key:
+        return jsonify({
+            "error": "FINNHUB_API_KEY is missing from backend environment."
+        }), 500
 
     url = "https://finnhub.io/api/v1/company-news"
 
