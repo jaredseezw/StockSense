@@ -4056,38 +4056,34 @@ body {
   pointer-events: none;
 }
 
-/* Tour explanation card — floats in a rotating corner with a small arrow
-   annotation instead of a big centered modal covering everything. */
+/* Tour explanation card — stays in ONE stable spot (bottom-right) across
+   every step so people never have to chase the mouse across the screen
+   to hit Next. A step can nudge it slightly (a little left, or up) only
+   when the default spot would otherwise sit on top of the thing being
+   explained — never a full jump to the opposite corner. */
 .tourFloatCard {
   position: fixed;
   z-index: 10000;
-  /* anchors .tourSkipCorner */
+  bottom: 28px;
+  right: 28px;
   max-width: 340px;
   background: #fff;
   border-radius: 18px;
   padding: 22px 24px;
   box-shadow: 0 16px 40px rgba(0,0,0,0.28);
   animation: onboardFadeIn 0.2s ease-out;
+  transition: right 0.2s ease, bottom 0.2s ease, left 0.2s ease;
 }
 .tourFloatCard h2 { margin: 0 0 8px; font-size: 1.15rem; color: #1f2a24; }
 .tourFloatCard p { margin: 0 0 18px; color: #556155; line-height: 1.5; font-size: 0.92rem; }
 /* Back/Next sit together as an aligned pair; Skip lives in the corner
    instead (see .tourSkipCorner) so it's not mistaken for a "Next" tap. */
 .tourFloatCard .tourCardActions { justify-content: flex-end; align-items: center; }
-.tourCorner-tr { top: 90px; right: 28px; }
-.tourCorner-tl { top: 90px; left: 260px; }
-.tourCorner-br { bottom: 28px; right: 28px; }
-.tourCorner-bl { bottom: 28px; left: 260px; }
-.tourArrow {
-  display: inline-block;
-  font-size: 0.8rem;
-  font-weight: 700;
-  color: #1f7d4c;
-  background: #eafaf0;
-  border-radius: 20px;
-  padding: 5px 12px;
-  margin-bottom: 10px;
-}
+/* Small nudges only — the card never leaves this general bottom-right
+   quadrant, so Next/Back stay within a few pixels of where the mouse
+   already is between clicks. */
+.tourNudge-left { right: 380px; }
+.tourNudge-up { bottom: 120px; }
 .tourSkipCorner {
   position: absolute;
   top: 10px;
@@ -4143,9 +4139,75 @@ body {
 }
 
 @media (max-width: 900px) {
-  .tourCorner-tl, .tourCorner-bl { left: 16px; }
+  .tourNudge-left { right: 16px; }
   .tourFloatCard { max-width: calc(100vw - 32px); }
 }
+
+/* ── Tour fake-demo pages (stock detail / simulator) ─────────────────── */
+.tourDemoOverlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: #f4f8f5;
+  overflow-y: auto;
+  padding: 36px;
+}
+.tourDemoStock .stockPageGrid { position: relative; }
+.tourHighlight {
+  position: relative;
+  box-shadow: 0 0 0 3px #1f7d4c, 0 16px 40px rgba(31,125,76,0.18);
+  z-index: 2;
+}
+.tourDim {
+  position: relative;
+  filter: blur(2px);
+  opacity: 0.55;
+  pointer-events: none;
+}
+.aiDemoBubble {
+  background: #f4f8f5;
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-top: 12px;
+}
+.aiDemoBubble p { margin: 0 0 8px; font-size: 0.9rem; line-height: 1.5; color: #33463a; }
+.aiDemoBubble p:last-child { margin-bottom: 0; }
+
+/* Numbered callout: a small dot + short label. Deliberately lightweight so
+   it doesn't fight for attention with the actual content it's pointing at. */
+.tourAnnotation {
+  position: absolute;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.tourAnnotationDot {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #1f7d4c;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(31,125,76,0.4);
+}
+.tourAnnotationLabel {
+  background: #1f2a24;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 5px 10px;
+  border-radius: 8px;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.18);
+}
+.tradeCashInfo, .sim-field { position: relative; }
 
 /* ── Glaring, repeating signup modal (not a dismiss-and-forget toast) ─── */
 .signupNudgeBackdrop {

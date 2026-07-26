@@ -121,10 +121,68 @@ def _fmt_volume(n):
 # ---------------------------------------------------------------------------
 
 def fetch_quote(ticker: str) -> dict:
-    q = _yahoo_quote(ticker)
+    # Tier 1: Yahoo's quote endpoint — richest data (name, market cap, volume)
+    # when it isn't blocked.
+    q = {}
+    price = None
+    prev = None
+    try:
+        q = _yahoo_quote(ticker)
+        price = _safe(q.get("regularMarketPrice"))
+        prev = _safe(q.get("regularMarketPreviousClose"))
+    except Exception:
+        pass
 
-    price = _safe(q.get("regularMarketPrice"))
-    prev = _safe(q.get("regularMarketPreviousClose"))
+    # Tier 2: yf.Ticker().info — different code path, sometimes works when
+    # the quote endpoint above is blocked (or vice versa).
+    if price is None:
+        try:
+            info = _ticker(ticker).info
+            price = _safe(info.get("regularMarketPrice") or info.get("currentPrice"))
+            prev = _safe(info.get("previousClose") or info.get("regularMarketPreviousClose"))
+        except Exception:
+            pass
+
+    # Tier 3: Finnhub (needs FINNHUB_API_KEY set).
+    if price is None:
+        try:
+            fh = _finnhub_quote(ticker)
+            price = _safe(fh.get("c"))
+            prev = _safe(fh.get("pc"))
+        except Exception:
+            pass
+
+    # Tier 4: Stooq, no key needed.
+    if price is None:
+        try:
+            sq = _stooq_quote(ticker)
+            price = _safe(sq.get("c"))
+            prev = _safe(sq.get("pc"))
+        except Exception:
+            pass
+
+    # Tier 5 (last resort): yf.download() hits Yahoo's chart endpoint, a
+    # different code path from tiers 1-2 that's proven reliable elsewhere
+    # in this app (Top Movers). This is what actually keeps a ticker like
+    # BTC-USD moving 24/7 instead of freezing on the one price tier 1
+    # happened to succeed with once and never refreshing again — every
+    # tier above raising forever otherwise just serves that same stale
+    # cached value indefinitely.
+    if price is None:
+        try:
+            hist = yf.download(ticker, period="5d", interval="1d",
+                                progress=False, auto_adjust=True)
+            if isinstance(hist.columns, pd.MultiIndex):
+                hist.columns = hist.columns.get_level_values(0)
+            closes = hist["Close"].dropna()
+            if len(closes) >= 2:
+                price = round(float(closes.iloc[-1]), 2)
+                prev = round(float(closes.iloc[-2]), 2)
+        except Exception:
+            pass
+
+    if price is None:
+        raise ValueError(f"No price for {ticker}")
 
     change_abs = round(price - prev, 2) if price and prev else None
     change_pct = round((price - prev) / prev * 100, 2) if price and prev else None
