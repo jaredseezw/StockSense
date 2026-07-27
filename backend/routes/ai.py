@@ -21,8 +21,16 @@ ai_bp = Blueprint("ai", __name__)
 # hammering it on every message (that just burns more quota and makes the
 # user wait for a call that's going to fail anyway). Back off for a bit and
 # return the friendly fallback immediately instead.
+#
+# Two SEPARATE cooldowns, not one shared global: /ai/simulator-explain uses
+# Google Search grounding, which has its own much stricter quota than plain
+# text generation (see the comment above the `attempts` list below). Sharing
+# one cooldown meant burning through the tiny grounding quota would also
+# lock out /ai/chat for 90 seconds, even though chat's own (much larger)
+# quota was nowhere near exhausted.
 # ---------------------------------------------------------------------------
-_quota_cooldown_until = 0
+_simulator_quota_cooldown_until = 0
+_chat_quota_cooldown_until = 0
 _QUOTA_COOLDOWN_SECONDS = 90
 
 # Lighter model with its own separate quota pool — tried once as a backup
@@ -30,12 +38,18 @@ _QUOTA_COOLDOWN_SECONDS = 90
 # "basic explanation" fallback text.
 _FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite")
 
-def _in_quota_cooldown():
-    return time.time() < _quota_cooldown_until
+def _in_quota_cooldown(scope: str) -> bool:
+    now = time.time()
+    if scope == "simulator":
+        return now < _simulator_quota_cooldown_until
+    return now < _chat_quota_cooldown_until
 
-def _start_quota_cooldown():
-    global _quota_cooldown_until
-    _quota_cooldown_until = time.time() + _QUOTA_COOLDOWN_SECONDS
+def _start_quota_cooldown(scope: str):
+    global _simulator_quota_cooldown_until, _chat_quota_cooldown_until
+    if scope == "simulator":
+        _simulator_quota_cooldown_until = time.time() + _QUOTA_COOLDOWN_SECONDS
+    else:
+        _chat_quota_cooldown_until = time.time() + _QUOTA_COOLDOWN_SECONDS
 
 
 def _is_quota_error(error_message: str) -> bool:
@@ -126,7 +140,7 @@ def explain_simulator():
             "reply": fallback
         })
 
-    if _in_quota_cooldown():
+    if _in_quota_cooldown("simulator"):
         fallback = (
             f"You bought {ticker} on {buy_date} at about ${buy_price}. "
             f"By {current_date}, the price was about ${current_price}. "
@@ -249,7 +263,7 @@ def explain_simulator():
         print("==================================")
 
         if _is_quota_error(error_message):
-            _start_quota_cooldown()
+            _start_quota_cooldown("simulator")
             fallback = (
                 f"You bought {ticker} on {buy_date} at about ${buy_price}. "
                 f"By {current_date}, the price was about ${current_price}. "
@@ -290,7 +304,7 @@ def ai_chat():
             )
         })
 
-    if _in_quota_cooldown():
+    if _in_quota_cooldown("chat"):
         return jsonify({
             "reply": "I'm handling a lot of requests right now — please try again in a moment."
         })
@@ -349,10 +363,32 @@ def ai_chat():
     try:
         client = genai.Client()
 
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=convo,
-        )
+        primary_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+
+        # Same idea as /ai/simulator-explain's retry chain: try the primary
+        # model first, and if (and only if) it's specifically a quota/429
+        # error, retry once on the lighter fallback model (separate quota
+        # pool) before giving up. Any non-quota error still raises immediately.
+        attempts = [primary_model, _FALLBACK_MODEL]
+
+        response = None
+        last_error = None
+        for attempt_model in attempts:
+            try:
+                response = client.models.generate_content(
+                    model=attempt_model,
+                    contents=convo,
+                )
+                break
+            except Exception as attempt_error:
+                last_error = attempt_error
+                if not _is_quota_error(str(attempt_error)):
+                    raise
+                print(f"Rate-limited on {attempt_model} for /ai/chat, trying next option")
+                continue
+
+        if response is None:
+            raise last_error
 
         return jsonify({"reply": response.text})
 
@@ -363,8 +399,8 @@ def ai_chat():
         print(error_message)
         print("========================================")
 
-        if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
-            _start_quota_cooldown()
+        if _is_quota_error(error_message):
+            _start_quota_cooldown("chat")
             return jsonify({
                 "reply": "I'm handling a lot of requests right now — please try again in a moment."
             })
@@ -397,7 +433,7 @@ def generate_quiz():
     if not os.getenv("GEMINI_API_KEY") and not os.getenv("GOOGLE_API_KEY"):
         return jsonify({"error": "Gemini is not connected — use the static quiz bank instead."}), 503
 
-    if _in_quota_cooldown():
+    if _in_quota_cooldown("chat"):
         return jsonify({"error": "AI is busy right now — using the standard quiz bank instead."}), 503
 
     prompt = f"""
@@ -460,7 +496,7 @@ def generate_quiz():
     except Exception as e:
         error_message = str(e)
         if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
-            _start_quota_cooldown()
+            _start_quota_cooldown("chat")
         print("========== GEMINI QUIZ ERROR ==========")
         print(error_message)
         print("========================================")
