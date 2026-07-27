@@ -1185,334 +1185,56 @@ function MetricModal({ metric, onClose }) {
     </div>
   );
 }
-// ── Tour demo components ────────────────────────────────────────────────
-// Fully static, no API calls — used only while tourActive is true, laid
-// over the real page so the guided tour always has something convincing
-// to show regardless of whether the viewer is signed in, has data, or the
-// market is even open.
+// ── Tour spotlight ──────────────────────────────────────────────────────────────
+// Highlights a piece of the REAL, live page (not a mock/sample screen) by
+// blurring everything outside its bounding box. `selector` is a CSS
+// selector for the real element to highlight; if it cannot be found (still
+// loading, off-screen, etc.) the whole page just dims/blurs instead.
+function TourSpotlight({ selector }) {
+  const [rect, setRect] = useState(null);
 
-function TourAnnotation({ top, left, side = "right", n, label }) {
+  useEffect(() => {
+    if (!selector) { setRect(null); return; }
+
+    function measure() {
+      const el = document.querySelector(selector);
+      if (!el) { setRect(null); return; }
+      const r = el.getBoundingClientRect();
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+    }
+
+    const raf1 = requestAnimationFrame(() => requestAnimationFrame(measure));
+    const interval = setInterval(measure, 350);
+    window.addEventListener("resize", measure);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      clearInterval(interval);
+      window.removeEventListener("resize", measure);
+    };
+  }, [selector]);
+
+  if (!rect) {
+    return <div className="tourSpotlightBlur tourSpotlightFull" />;
+  }
+
+  const pad = 10;
+  const top = Math.max(rect.top - pad, 0);
+  const left = Math.max(rect.left - pad, 0);
+  const width = rect.width + pad * 2;
+  const height = rect.height + pad * 2;
+
   return (
-    <div className={`tourAnnotation tourAnnotation-${side}`} style={{ top, left }}>
-      <span className="tourAnnotationDot">{n}</span>
-      <span className="tourAnnotationLabel">{label}</span>
-    </div>
+    <>
+      <div className="tourSpotlightBlur" style={{ top: 0, left: 0, right: 0, height: top }} />
+      <div className="tourSpotlightBlur" style={{ top: top + height, left: 0, right: 0, bottom: 0 }} />
+      <div className="tourSpotlightBlur" style={{ top, left: 0, width: left, height }} />
+      <div className="tourSpotlightBlur" style={{ top, left: left + width, right: 0, height }} />
+      <div className="tourSpotlightRing" style={{ top, left, width, height }} />
+    </>
   );
 }
 
-function TourStockDemo({ focus }) {
-  // Static AAPL-shaped sparkline — just needs to look like a real chart.
-  const points = "0,58 20,52 40,55 60,44 80,47 100,36 120,40 140,28 160,32 180,18 200,22 220,10 240,14";
-  return (
-    <section className="page tourDemoStock">
-      <div className="stockPageHeaderRow">
-        <button className="backBtn" disabled>← Back</button>
-        <button className="askAiAboutStockBtn" disabled>🤖 Ask AI about this stock</button>
-      </div>
-      <h1>
-        <span className="stockPageName">Apple Inc.</span>
-        <span className="stockPageTicker">AAPL</span>
-      </h1>
-      <div className="stockPriceRow">
-        <span className="stockBigPrice">$175.43</span>
-        <span className="green stockBigChange">▲ 1.18% (+2.05)</span>
-      </div>
-
-      <div className="timeframes">
-        {["1D", "1W", "1M", "3M", "1Y"].map((t) => (
-          <button key={t} className={t === "1M" ? "selected" : ""} disabled>{t}</button>
-        ))}
-      </div>
-
-      <div className="stockPageGrid">
-        <div className={`card stockChartCard ${focus === "trade" ? "tourDim" : "tourHighlight"}`}>
-          {focus === "overview" && (
-            <>
-              <TourAnnotation top="8%" left="6%" n="1" label="Live price & daily change" />
-              <TourAnnotation top="45%" left="55%" n="2" label="Interactive price chart" />
-            </>
-          )}
-          <div className="chartHeader">
-            <div>
-              <h3>Apple Inc.</h3>
-              <span className="green chartPeriodChange">▲ 6.4% this period</span>
-            </div>
-          </div>
-          <div className="chartWrap">
-            <svg viewBox="0 0 240 70" preserveAspectRatio="none" style={{ width: "100%", height: 160 }}>
-              <polyline fill="none" stroke="#1a9c5c" strokeWidth="2" points={points} />
-              <polygon fill="rgba(26,156,92,0.12)" points={`0,70 ${points} 240,70`} />
-            </svg>
-          </div>
-        </div>
-
-        <div className={`card tradeCard ${focus === "trade" ? "tourHighlight" : "tourDim"}`}>
-          <h3>Trade AAPL</h3>
-          <p className="tradeHint">Demo trading — trades execute instantly at the current price shown above.</p>
-          <div className="tradeRow">
-            <div className="tradeCashInfo">
-              <span>Cash available</span>
-              <strong>$10,000.00</strong>
-              {focus === "trade" && <TourAnnotation top="-6%" left="0%" n="1" label="Your demo cash balance" />}
-            </div>
-            <div className="tradeCashInfo">
-              <span>You own</span>
-              <strong>0 shares</strong>
-            </div>
-          </div>
-          <div className="sim-form" style={{ position: "relative" }}>
-            <div className="sim-field">
-              <label>Shares</label>
-              <input className="sim-input" type="number" placeholder="e.g. 2.5" readOnly value="2.5" />
-              {focus === "trade" && <TourAnnotation top="-10%" left="55%" n="2" label="Fractional shares OK — min 0.01" />}
-            </div>
-            <button className="sim-primary-btn" disabled>Buy at $175.43</button>
-            <button className="sim-primary-btn tradeSellBtn" disabled>Sell</button>
-            {focus === "trade" && <TourAnnotation top="88%" left="6%" n="3" label="One click — instant execution" />}
-          </div>
-        </div>
-
-        <div className={`card stockMetricsCard ${focus === "trade" ? "tourDim" : "tourHighlight"}`}>
-          <div className="keyMetricsHeader"><h3>Key Metrics</h3></div>
-          {focus === "overview" && <TourAnnotation top="4%" left="60%" n="3" label="P/E, EPS, market cap & more" />}
-          <div className="metricGrid">
-            {[
-              ["P/E Ratio", "29.4"], ["EPS", "$6.13"], ["Market Cap", "$2.71T"],
-              ["Volume", "58.2M"], ["Dividend Yield", "0.44%"], ["52W Range", "$124.17 – $199.62"],
-            ].map(([label, value]) => (
-              <div className="metricItem" key={label}>
-                <span className="metricLabel">{label}</span>
-                <span className="metricValue">{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TourDashboardDemo() {
-  return (
-    <section className="page tourDemoStock">
-      <h1>Good evening, there! 👋</h1>
-      <div className="balance" style={{ position: "relative", display: "flex", gap: 16 }}>
-        {[
-          ["S&P 500", "6,481.20", "+0.42%"],
-          ["NASDAQ", "21,340.11", "+0.68%"],
-          ["DOW", "44,982.55", "+0.21%"],
-        ].map(([label, val, chg]) => (
-          <div className="card" key={label} style={{ flex: 1 }}>
-            <p>{label}</p>
-            <h3>{val}</h3>
-            <span className="green">▲ {chg}</span>
-          </div>
-        ))}
-        <TourAnnotation top="-14%" left="4%" n="1" label="Live market indices, updated all day" />
-      </div>
-
-      <div className="stockPageGrid" style={{ marginTop: 20 }}>
-        <div className="card" style={{ position: "relative" }}>
-          <h3>Sign up to get $10,000 demo cash</h3>
-          <p className="tradeHint">Create a free account to start buying and selling at live prices.</p>
-        </div>
-        <div className="card tourHighlight">
-          <h3>Top Movers Today</h3>
-          {[["ENPH", "+13.84%"], ["NVDA", "+2.35%"], ["MELI", "+2.02%"]].map(([t, c]) => (
-            <div className="tradeCashInfo" key={t}><span>{t}</span><strong className="green">{c}</strong></div>
-          ))}
-          <TourAnnotation top="4%" left="55%" n="2" label="See what's trending right now" />
-        </div>
-        <div className="card">
-          <h3>📰 Market News</h3>
-          <p className="tradeHint">Fresh headlines from Reuters, CNBC & more, refreshed throughout the day.</p>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TourSearchBrowseDemo() {
-  return (
-    <section className="page tourDemoStock">
-      <h1>Search Stocks</h1>
-      <p className="tradeHint">Search by company name or ticker. Example: Apple or AAPL.</p>
-      <div className="sim-form" style={{ position: "relative" }}>
-        <div className="sim-field" style={{ flex: 1 }}>
-          <input className="sim-input" readOnly value="Apple" />
-        </div>
-        <button className="sim-primary-btn" disabled>Search</button>
-        <TourAnnotation top="-40%" left="6%" n="1" label="Type any company name or ticker" />
-      </div>
-
-      <div className="stockPageGrid" style={{ marginTop: 20 }}>
-        <div className="card">
-          <h3>▲ Top Gainers</h3>
-          {[["ENPH", "$60.5", "+13.84%"], ["NVDA", "$949.5", "+2.35%"]].map(([t, p, c]) => (
-            <div className="tradeCashInfo" key={t}><span>{t}</span><strong>{p}</strong><span className="green">{c}</span></div>
-          ))}
-        </div>
-        <div className="card tourHighlight" style={{ gridColumn: "span 2" }}>
-          <h3>Browse by Sector</h3>
-          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-            {["ETFs", "Technology", "Energy", "Healthcare", "Finance"].map((s) => (
-              <span key={s} className="chipBtn" style={{ display: "inline-block" }}>{s}</span>
-            ))}
-          </div>
-          <TourAnnotation top="6%" left="60%" n="2" label="Browse curated sectors instead of searching" />
-        </div>
-      </div>
-    </section>
-  );
-}
-
-function TourPortfolioDemo() {
-  const rows = [
-    { ticker: "AAPL", name: "Apple", change: 1.18, price: 175.43, value: 438.58, unrealised: 12.40, shares: 2.5 },
-    { ticker: "NVDA", name: "Nvidia", change: 2.35, price: 949.50, value: 949.50, unrealised: -8.10, shares: 1 },
-    { ticker: "VOO", name: "S&P 500 ETF", change: 0.42, price: 585.20, value: 1170.40, unrealised: 34.60, shares: 2 },
-  ];
-  return (
-    <section className="page tourDemoStock">
-      <h1>Portfolio</h1>
-      <div className="stats" style={{ position: "relative" }}>
-        <div className="card"><p>Total Value</p><h2>$12,558.48</h2></div>
-        <div className="card"><p>Unrealised P&L</p><h2 className="green">↑ $38.90</h2></div>
-        <div className="card"><p>Cash Balance</p><h2>$10,000.00</h2></div>
-        <TourAnnotation top="-16%" left="4%" n="1" label="Total value & gains at a glance" />
-      </div>
-      <div className="card portfolioPositionsCard tourHighlight" style={{ marginTop: 20 }}>
-        <h3>Positions</h3>
-        <div className="table head">
-          {["Stock", "% Change", "Current Price", "Value", "Unrealised P&L", "Qty"].map((l) => <span key={l}>{l}</span>)}
-        </div>
-        {rows.map((h) => (
-          <div className="table" key={h.ticker}>
-            <b><span className="rowTicker">{h.ticker}</span><small className="rowName">{h.name}</small></b>
-            <span className="green">▲ {h.change}%</span>
-            <span>${h.price.toFixed(2)}</span>
-            <span>${h.value.toFixed(2)}</span>
-            <span className={h.unrealised >= 0 ? "green" : "red"}>{h.unrealised >= 0 ? "↑" : "↓"} ${Math.abs(h.unrealised).toFixed(2)}</span>
-            <span>{h.shares}</span>
-          </div>
-        ))}
-        <TourAnnotation top="10%" left="70%" n="2" label="Click any holding to jump to its page" />
-      </div>
-    </section>
-  );
-}
-
-function TourLearnDemo() {
-  return (
-    <section className="page tourDemoStock">
-      <h1>Learn</h1>
-      <div className="stockPageGrid" style={{ position: "relative" }}>
-        <div className="card tourHighlight">
-          <h3>Key Metrics 101</h3>
-          <div className="metricGrid">
-            {[["P/E Ratio", "Beginner"], ["EPS", "Beginner"], ["Beta", "Intermediate"], ["ROE", "Advanced"]].map(([l, tag]) => (
-              <div className="metricItem" key={l}><span className="metricLabel">{l}</span><span className="metricValue">{tag}</span></div>
-            ))}
-          </div>
-        </div>
-        <div className="card">
-          <h3>Take a quiz</h3>
-          <p className="tradeHint">Test yourself after each lesson — your best score is saved.</p>
-        </div>
-        <TourAnnotation top="-10%" left="4%" n="1" label="Bite-sized lessons on every metric" />
-        <TourAnnotation top="46%" left="70%" n="2" label="Quizzes track your progress" />
-      </div>
-    </section>
-  );
-}
-
-function TourAiDemo() {
-  return (
-    <section className="page tourDemoStock">
-      <h1>AI Assistant</h1>
-      <div className="card" style={{ position: "relative" }}>
-        <div className="aiDemoBubble">
-          <p><b>You:</b> What's a P/E ratio?</p>
-          <p><b>AI Coach:</b> It's the stock's price divided by its earnings per share — a quick way to gauge whether a stock looks expensive or cheap relative to its profits.</p>
-        </div>
-        <TourAnnotation top="-8%" left="4%" n="1" label="Ask anything, beginner or advanced" />
-      </div>
-      <div className="card tourHighlight" style={{ marginTop: 20 }}>
-        <h3>Suggested Prompts</h3>
-        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-          {["Beginner", "Metrics", "Stocks", "ETFs", "Portfolio"].map((c) => (
-            <span key={c} className="chipBtn" style={{ display: "inline-block" }}>{c}</span>
-          ))}
-        </div>
-        <TourAnnotation top="8%" left="60%" n="2" label="Tap a category to get started fast" />
-      </div>
-    </section>
-  );
-}
-
-function TourLeaderboardDemo() {
-  const names = ["You", "Jared S.", "Wei Ming", "Aisha K.", "Marcus T.", "Priya R.", "Daniel L.", "Nina F."];
-  const values = [12558.48, 14320.10, 13890.55, 11940.20, 11205.80, 10870.30, 10420.15, 9980.60];
-  return (
-    <section className="page tourDemoStock">
-      <h1>Leaderboard</h1>
-      <div className="card tourHighlight" style={{ position: "relative" }}>
-        {names.map((n, i) => (
-          <div className="tradeCashInfo" key={n} style={{ fontWeight: n === "You" ? 800 : 500 }}>
-            <span>#{i + 1} {n}</span>
-            <strong className="leaderboardValue">${values[i].toFixed(2)}</strong>
-          </div>
-        ))}
-        <TourAnnotation top="-8%" left="4%" n="1" label="See how you stack up against friends" />
-        <TourAnnotation top="90%" left="60%" n="2" label="Opt in anytime from Account settings" />
-      </div>
-    </section>
-  );
-}
-
-function TourSimulatorDemo() {
-  const points = "0,60 30,55 60,58 90,48 120,50 150,35 180,40 210,20 240,25 270,10";
-  return (
-    <section className="page tourDemoStock">
-      <h1><span className="stockPageName">SIMULATOR</span></h1>
-      <div className="card" style={{ position: "relative", marginBottom: 20 }}>
-        <h3>Historical Investment Simulator</h3>
-        <p className="tradeHint">Pick a stock, choose a buy date, invest virtual money, then scrub forward.</p>
-        <div className="sim-form">
-          <div className="sim-field" style={{ flex: 1 }}>
-            <label>Search by company name or ticker</label>
-            <input className="sim-input" readOnly value="Tesla (TSLA)" />
-          </div>
-          <button className="sim-primary-btn" disabled>Loaded 10-Year History ✓</button>
-        </div>
-        <TourAnnotation top="4%" left="60%" n="1" label="Search any real stock" />
-      </div>
-
-      <div className="card tourHighlight" style={{ position: "relative", marginBottom: 20 }}>
-        <svg viewBox="0 0 270 70" preserveAspectRatio="none" style={{ width: "100%", height: 150 }}>
-          <polyline fill="none" stroke="#1a9c5c" strokeWidth="2" points={points} />
-          <polygon fill="rgba(26,156,92,0.12)" points={`0,70 ${points} 270,70`} />
-        </svg>
-        <TourAnnotation top="6%" left="8%" n="2" label="Scrub through 10 years of history" />
-        <div className="stats" style={{ marginTop: 12 }}>
-          <div className="card"><p>Profit / Loss</p><h2 className="green">+$412.80</h2></div>
-          <div className="card"><p>Return %</p><h2 className="green">+41.28%</h2></div>
-          <div className="card"><p>Annualised Return</p><h2 className="green">+7.85%</h2></div>
-        </div>
-      </div>
-
-      <div className="card tourHighlight" style={{ position: "relative" }}>
-        <h3>StockSense AI Coach</h3>
-        <p className="tradeHint">Ask AI to explain your simulator result in simple English.</p>
-        <div className="aiDemoBubble">
-          <p><b>You:</b> Explain this result like I'm new to investing.</p>
-          <p><b>AI Coach:</b> A $1,000 buy 10 years ago would be worth $1,412.80 today — a 41% total gain, or about 7.85% per year, roughly in line with the broader market average.</p>
-        </div>
-        <TourAnnotation top="8%" left="60%" n="3" label="Plain-English AI explanations" />
-      </div>
-    </section>
-  );
-}
 
 function SimulatorChart({ history, buyIndex, currentIndex }) {
   if (!history || !history.prices || history.prices.length === 0) {
@@ -1647,28 +1369,41 @@ function App() {
   }, []);
 
   const TOUR_STEPS = [
-    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place.", demo: "dashboard", nudge: "left" },
-    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker, or browse curated sectors.", demo: "searchBrowse" },
-    { page: "search", title: "3. View stock details", body: "Click a result to see its live price, chart, and key metrics like P/E and EPS.", demo: "stockOverview", nudge: "left" },
-    { page: "search", title: "4. Buy your first stock", body: "Enter a share amount and hit Buy — trades execute instantly at the live price shown. Fractional shares (as low as 0.01) are fine.", demo: "stockTrade", nudge: "left" },
-    { page: "portfolio", title: "5. Track your portfolio", body: "This is where you'll see your holdings, gains/losses, and total value once you start trading.", demo: "portfolio", nudge: "left" },
-    { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Pick a stock and a past buy date, then scrub forward to see how it would've played out — and ask the AI coach to explain the result.", demo: "simulator", nudge: "left" },
-    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself.", demo: "learn", nudge: "left" },
-    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What's a P/E ratio?\" to \"How does diversification work?\"", demo: "ai", nudge: "left" },
-    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else.", demo: "leaderboard", nudge: "left" },
-    { page: "dashboard", title: "10. You're ready! 🎉", body: "That's the full tour. Create a free account to get $10,000 in demo cash and start practicing for real." },
+    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place.", target: ".marketStrip" },
+    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker, or browse curated sectors.", target: ".searchWrap" },
+    { page: "stock", title: "3. View stock details", body: "Here’s a real stock’s page — live price, chart, and key metrics like P/E and EPS.", target: ".stockChartCard", stockTicker: "AAPL" },
+    { page: "stock", title: "4. Buy your first stock", body: "Enter a share amount and hit Buy — trades execute instantly at the live price shown. Fractional shares (as low as 0.01) are fine.", target: ".tradeCard", stockTicker: "AAPL" },
+    { page: "portfolio", title: "5. Track your portfolio", body: "This is where you’ll see your holdings, gains/losses, and total value once you start trading.", target: ".portfolioPositionsCard" },
+    { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Pick a stock and a past buy date, then scrub forward to see how it would’ve played out — and ask the AI coach to explain the result.", target: ".simulator-card" },
+    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself.", target: ".chips" },
+    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What’s a P/E ratio?\" to \"How does diversification work?\"", target: ".aiChatPage" },
+    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else.", target: ".leaderboardTable" },
+    { page: "dashboard", title: "10. You’re ready! 🎉", body: "That’s the full tour. Create a free account to get $10,000 in demo cash and start practicing for real.", target: null },
   ];
 
   function markTutorialSeen() {
     try { localStorage.setItem("stocksense_hasSeenTutorialPrompt", "true"); } catch {}
   }
 
+  // Moves the tour to a given step: updates the page, and if that step
+  // needs a specific stock loaded (e.g. the "view stock details" step),
+  // selects it using the same real navigation path a user clicking a
+  // search result would take — so the tour shows live, real data.
+  function goToTourStep(index) {
+    const step = TOUR_STEPS[index];
+    setTourStep(index);
+    if (step.stockTicker) {
+      goStock({ ticker: step.stockTicker, name: step.stockTicker });
+    } else {
+      setPage(step.page);
+    }
+  }
+
   function startTour() {
     markTutorialSeen();
     setShowWelcomeModal(false);
     setTourActive(true);
-    setTourStep(0);
-    setPage(TOUR_STEPS[0].page);
+    goToTourStep(0);
   }
 
   function declineTour() {
@@ -1685,14 +1420,12 @@ function App() {
       endTour();
       return;
     }
-    setTourStep(next);
-    setPage(TOUR_STEPS[next].page);
+    goToTourStep(next);
   }
 
   function prevTourStep() {
     const prev = Math.max(0, tourStep - 1);
-    setTourStep(prev);
-    setPage(TOUR_STEPS[prev].page);
+    goToTourStep(prev);
   }
 
   function endTour() {
@@ -2853,17 +2586,17 @@ function skipMonths(monthsToSkip) {
 
       {tourActive && (
         <>
+          {/* Blurs everything except the real element this step is about —
+              no fake screenshots, just the live page underneath. */}
+          <TourSpotlight selector={TOUR_STEPS[tourStep].target} />
+
           {/* Blocks clicks on the real page underneath — the tour is meant to
               be watched, not clicked through, so nothing here should be
               interactive except the tour card itself. */}
           <div className="tourClickBlocker" />
 
-          {/* Only the nav is blurred (except the tab we're currently explaining) —
-              the actual page content stays fully sharp so people can see what
-              the step is talking about. See the .sidebar.tourDimSidebar rules. */}
-          <div
-            className={`tourFloatCard ${TOUR_STEPS[tourStep].nudge ? `tourNudge-${TOUR_STEPS[tourStep].nudge}` : ""}`}
-          >
+          {/* Fixed in one spot for the whole tour so Next/Back never move. */}
+          <div className="tourFloatCard">
             <button className="tourSkipCorner" onClick={endTour} aria-label="Skip tour">Skip ✕</button>
             <div className="tourProgress">
               Step {tourStep + 1} of {TOUR_STEPS.length}
@@ -2914,19 +2647,7 @@ function skipMonths(monthsToSkip) {
       </aside>
 
       <main className="main">
-        {tourActive && TOUR_STEPS[tourStep].demo && (
-          <div className="tourDemoOverlay">
-            {TOUR_STEPS[tourStep].demo === "dashboard" && <TourDashboardDemo />}
-            {TOUR_STEPS[tourStep].demo === "searchBrowse" && <TourSearchBrowseDemo />}
-            {TOUR_STEPS[tourStep].demo === "stockOverview" && <TourStockDemo focus="overview" />}
-            {TOUR_STEPS[tourStep].demo === "stockTrade" && <TourStockDemo focus="trade" />}
-            {TOUR_STEPS[tourStep].demo === "portfolio" && <TourPortfolioDemo />}
-            {TOUR_STEPS[tourStep].demo === "simulator" && <TourSimulatorDemo />}
-            {TOUR_STEPS[tourStep].demo === "learn" && <TourLearnDemo />}
-            {TOUR_STEPS[tourStep].demo === "ai" && <TourAiDemo />}
-            {TOUR_STEPS[tourStep].demo === "leaderboard" && <TourLeaderboardDemo />}
-          </div>
-        )}
+
         {page === "dashboard" && (
           <>
             <div className="topbar">

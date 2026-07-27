@@ -4,7 +4,9 @@ from google.genai import types
 import os
 import requests
 import time
+import hashlib
 from datetime import datetime
+import cache
 
 def format_finnhub_date(timestamp):
     try:
@@ -23,12 +25,26 @@ ai_bp = Blueprint("ai", __name__)
 _quota_cooldown_until = 0
 _QUOTA_COOLDOWN_SECONDS = 90
 
+# Lighter model with its own separate quota pool — tried once as a backup
+# when the primary model is rate-limited, before we give up and show the
+# "basic explanation" fallback text.
+_FALLBACK_MODEL = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.1-flash-lite")
+
 def _in_quota_cooldown():
     return time.time() < _quota_cooldown_until
 
 def _start_quota_cooldown():
     global _quota_cooldown_until
     _quota_cooldown_until = time.time() + _QUOTA_COOLDOWN_SECONDS
+
+
+def _is_quota_error(error_message: str) -> bool:
+    return "RESOURCE_EXHAUSTED" in error_message or "429" in error_message
+
+
+def _simulator_explain_cache_key(ticker, buy_date, current_date, investment_amount):
+    raw = f"{ticker}:{buy_date}:{current_date}:{investment_amount}"
+    return "ai:sim-explain:" + hashlib.sha256(raw.encode()).hexdigest()
 
 
 @ai_bp.route("/ai/simulator-explain", methods=["POST"])
@@ -45,6 +61,15 @@ def explain_simulator():
     profit_loss = data.get("profitLoss")
     return_percentage = data.get("returnPercentage")
     news_items = []
+
+    # Same ticker + same buy/current dates + same investment amount always
+    # produces the same explanation, so serve a cached reply if we have one.
+    # This means once an explanation has been generated successfully, it
+    # stays instantly available even if Gemini's quota runs out later.
+    cache_key = _simulator_explain_cache_key(ticker, buy_date, current_date, investment_amount)
+    cached_reply = cache.get(cache_key)
+    if cached_reply is not None:
+        return jsonify({"reply": cached_reply})
 
     finnhub_key = os.getenv("FINNHUB_API_KEY")
 
@@ -174,16 +199,36 @@ def explain_simulator():
             google_search=types.GoogleSearch()
         )
 
-        response = client.models.generate_content(
-            model=os.getenv("GEMINI_MODEL", "gemini-3.5-flash"),
-            contents=prompt,
-            config=types.GenerateContentConfig(
-                tools=[grounding_tool],
-            ),
-        )
+        primary_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
+
+        try:
+            response = client.models.generate_content(
+                model=primary_model,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[grounding_tool],
+                ),
+            )
+        except Exception as primary_error:
+            # Primary model is rate-limited — the fallback model has its own
+            # quota pool, so it's worth one retry before showing the basic
+            # explanation. Any other kind of error just re-raises as-is.
+            if not _is_quota_error(str(primary_error)):
+                raise
+            print(f"Primary model rate-limited, retrying with {_FALLBACK_MODEL}")
+            response = client.models.generate_content(
+                model=_FALLBACK_MODEL,
+                contents=prompt,
+                config=types.GenerateContentConfig(
+                    tools=[grounding_tool],
+                ),
+            )
+
+        reply_text = response.text
+        cache.set(cache_key, reply_text, cache.TTL_METRICS * 12)  # ~1 hour
 
         return jsonify({
-            "reply": response.text
+            "reply": reply_text
         })
 
     except Exception as e:
@@ -193,7 +238,7 @@ def explain_simulator():
         print(error_message)
         print("==================================")
 
-        if "RESOURCE_EXHAUSTED" in error_message or "429" in error_message:
+        if _is_quota_error(error_message):
             _start_quota_cooldown()
             fallback = (
                 f"You bought {ticker} on {buy_date} at about ${buy_price}. "
