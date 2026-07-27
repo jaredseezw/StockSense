@@ -201,28 +201,38 @@ def explain_simulator():
 
         primary_model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash")
 
-        try:
-            response = client.models.generate_content(
-                model=primary_model,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[grounding_tool],
-                ),
-            )
-        except Exception as primary_error:
-            # Primary model is rate-limited — the fallback model has its own
-            # quota pool, so it's worth one retry before showing the basic
-            # explanation. Any other kind of error just re-raises as-is.
-            if not _is_quota_error(str(primary_error)):
-                raise
-            print(f"Primary model rate-limited, retrying with {_FALLBACK_MODEL}")
-            response = client.models.generate_content(
-                model=_FALLBACK_MODEL,
-                contents=prompt,
-                config=types.GenerateContentConfig(
-                    tools=[grounding_tool],
-                ),
-            )
+        # Google Search grounding has its own, much stricter quota that's
+        # separate from plain text generation — this is why /ai/chat (no
+        # grounding) can keep working fine while this endpoint hits 429s.
+        # So the retry chain drops grounding before it drops model: a
+        # non-grounded answer (using only the Finnhub headlines already
+        # fetched above) beats no AI answer at all.
+        attempts = [
+            (primary_model, True),
+            (primary_model, False),
+            (_FALLBACK_MODEL, False),
+        ]
+
+        response = None
+        last_error = None
+        for attempt_model, use_grounding in attempts:
+            try:
+                config = types.GenerateContentConfig(tools=[grounding_tool]) if use_grounding else None
+                response = client.models.generate_content(
+                    model=attempt_model,
+                    contents=prompt,
+                    config=config,
+                )
+                break
+            except Exception as attempt_error:
+                last_error = attempt_error
+                if not _is_quota_error(str(attempt_error)):
+                    raise
+                print(f"Rate-limited on {attempt_model} (grounding={use_grounding}), trying next option")
+                continue
+
+        if response is None:
+            raise last_error
 
         reply_text = response.text
         cache.set(cache_key, reply_text, cache.TTL_METRICS * 12)  # ~1 hour

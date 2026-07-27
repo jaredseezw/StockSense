@@ -1190,17 +1190,34 @@ function MetricModal({ metric, onClose }) {
 // blurring everything outside its bounding box. `selector` is a CSS
 // selector for the real element to highlight; if it cannot be found (still
 // loading, off-screen, etc.) the whole page just dims/blurs instead.
-function TourSpotlight({ selector }) {
+function TourSpotlight({ selector, fullPage }) {
   const [rect, setRect] = useState(null);
+  // `selector` can be a single CSS selector or an array of them — when it's
+  // an array, the spotlight is the union bounding box of every matched
+  // element (e.g. the price/change row AND the chart card together),
+  // without needing to change either element's place in the layout.
+  const selectors = Array.isArray(selector) ? selector : (selector ? [selector] : []);
+  const selectorsKey = selectors.join("|");
 
   useEffect(() => {
-    if (!selector) { setRect(null); return; }
+    // Full-page steps show the whole screen clear, with no blur and no
+    // measuring loop — this is also what keeps those steps snappy instead
+    // of paying for a 350ms remeasure + backdrop-filter repaint every tick.
+    if (fullPage || selectors.length === 0) { setRect(null); return; }
 
     function measure() {
-      const el = document.querySelector(selector);
-      if (!el) { setRect(null); return; }
-      const r = el.getBoundingClientRect();
-      setRect({ top: r.top, left: r.left, width: r.width, height: r.height });
+      const rects = selectors
+        .map((s) => document.querySelector(s))
+        .filter(Boolean)
+        .map((el) => el.getBoundingClientRect());
+
+      if (rects.length === 0) { setRect(null); return; }
+
+      const top = Math.min(...rects.map((r) => r.top));
+      const left = Math.min(...rects.map((r) => r.left));
+      const right = Math.max(...rects.map((r) => r.right));
+      const bottom = Math.max(...rects.map((r) => r.bottom));
+      setRect({ top, left, width: right - left, height: bottom - top });
     }
 
     const raf1 = requestAnimationFrame(() => requestAnimationFrame(measure));
@@ -1212,7 +1229,12 @@ function TourSpotlight({ selector }) {
       clearInterval(interval);
       window.removeEventListener("resize", measure);
     };
-  }, [selector]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectorsKey, fullPage]);
+
+  if (fullPage) {
+    return null;
+  }
 
   if (!rect) {
     return <div className="tourSpotlightBlur tourSpotlightFull" />;
@@ -1369,16 +1391,16 @@ function App() {
   }, []);
 
   const TOUR_STEPS = [
-    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place.", target: ".marketStrip" },
-    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker, or browse curated sectors.", target: ".searchWrap" },
-    { page: "stock", title: "3. View stock details", body: "Here’s a real stock’s page — live price, chart, and key metrics like P/E and EPS.", target: ".stockChartCard", stockTicker: "AAPL" },
+    { page: "dashboard", title: "1. Dashboard", body: "Your home base — live market indices, portfolio snapshot, and market news, all in one place.", target: null, fullPage: true },
+    { page: "search", title: "2. Search stocks", body: "Search any real stock by name or ticker, or browse curated sectors.", target: null, fullPage: true },
+    { page: "stock", title: "3. View stock details", body: "Here’s a real stock’s page — live price, chart, and key metrics like P/E and EPS.", target: [".stockPriceRow", ".stockChartCard"], stockTicker: "AAPL" },
     { page: "stock", title: "4. Buy your first stock", body: "Enter a share amount and hit Buy — trades execute instantly at the live price shown. Fractional shares (as low as 0.01) are fine.", target: ".tradeCard", stockTicker: "AAPL" },
-    { page: "portfolio", title: "5. Track your portfolio", body: "This is where you’ll see your holdings, gains/losses, and total value once you start trading.", target: ".portfolioPositionsCard" },
+    { page: "portfolio", title: "5. Track your portfolio", body: "This is where you’ll see your holdings, gains/losses, and total value once you start trading.", target: null, fullPage: true },
     { page: "simulator", title: "6. Historical Simulator", body: "Time-travel your investments. Pick a stock and a past buy date, then scrub forward to see how it would’ve played out — and ask the AI coach to explain the result.", target: ".simulator-card" },
-    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself.", target: ".chips" },
-    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What’s a P/E ratio?\" to \"How does diversification work?\"", target: ".aiChatPage" },
-    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else.", target: ".leaderboardTable" },
-    { page: "dashboard", title: "10. You’re ready! 🎉", body: "That’s the full tour. Create a free account to get $10,000 in demo cash and start practicing for real.", target: null },
+    { page: "learn", title: "7. Learn", body: "Bite-sized lessons on key metrics, plus quizzes to test yourself.", target: null, fullPage: true },
+    { page: "ai", title: "8. AI Assistant", body: "Ask anything about investing — from \"What’s a P/E ratio?\" to \"How does diversification work?\"", target: null, fullPage: true },
+    { page: "leaderboard", title: "9. Leaderboard", body: "See how your virtual portfolio stacks up against everyone else.", target: null, fullPage: true },
+    { page: "dashboard", title: "10. You’re ready! 🎉", body: "That’s the full tour. Create a free account to get $10,000 in demo cash and start practicing for real.", target: null, fullPage: true },
   ];
 
   function markTutorialSeen() {
@@ -1403,6 +1425,10 @@ function App() {
     markTutorialSeen();
     setShowWelcomeModal(false);
     setTourActive(true);
+    // Fire-and-forget: warms the backend's cache for AAPL well before the
+    // user reaches steps 3/4, so those steps load instantly instead of
+    // showing "Loading live data..." while the tour is mid-explanation.
+    fetch(`${API}/stock/AAPL`).catch(() => {});
     goToTourStep(0);
   }
 
@@ -2588,7 +2614,7 @@ function skipMonths(monthsToSkip) {
         <>
           {/* Blurs everything except the real element this step is about —
               no fake screenshots, just the live page underneath. */}
-          <TourSpotlight selector={TOUR_STEPS[tourStep].target} />
+          <TourSpotlight selector={TOUR_STEPS[tourStep].target} fullPage={TOUR_STEPS[tourStep].fullPage} />
 
           {/* Blocks clicks on the real page underneath — the tour is meant to
               be watched, not clicked through, so nothing here should be
